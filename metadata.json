@@ -1,0 +1,6 @@
+{
+  "name": "AlumniCafe POS",
+  "description": "A full-featured Point-of-Sale system for AlumniCafe at Holy Cross of Davao College, featuring local currency, VAT, and professional receipt printing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

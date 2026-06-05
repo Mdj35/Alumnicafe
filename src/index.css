@@ -1,0 +1,77 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Courier+Prime&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-heading: "Poppins", sans-serif;
+  --font-mono: "Courier Prime", monospace;
+
+  --color-hcdc-blue: #1A3A6B;
+  --color-hcdc-blue-dark: #0D2347;
+  --color-hcdc-red: #C0282A;
+  --color-hcdc-gold: #E8A020;
+  --color-hcdc-light-blue: #E8EEF8;
+  --color-hcdc-light-red: #F5E8E8;
+}
+
+@layer base {
+  body {
+    @apply font-sans text-[#1A1A2E] bg-gray-50 overflow-hidden h-screen;
+  }
+}
+
+@media print {
+  @page {
+    size: 80mm auto;
+    margin: 0;
+  }
+  
+  html, body {
+    width: 80mm;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+  
+  #receipt-content, #receipt-content * {
+    visibility: visible;
+  }
+  
+  #receipt-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 !important;
+    padding: 10mm 5mm !important; /* Standard receipt padding */
+    background: white;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
