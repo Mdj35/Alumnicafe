@@ -24,7 +24,8 @@
     "react-router-dom": "^7.15.0",
     "recharts": "^3.8.1",
     "vite": "^6.2.3",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",

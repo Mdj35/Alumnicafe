@@ -30,7 +30,7 @@ import {
   Minus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 import {
   XAxis,
   YAxis,
@@ -409,113 +409,184 @@ export default function AdminDashboard() {
     });
   };
   const generateXlsxReport = (data: any[]) => {
-    const cashiersInData = Array.from(new Set(data.filter(t => t.status !== 'Voided').map(t => t.cashier))).sort();
-    const itemStats: Record<string, { price: number, cashiers: Record<string, { qty: number, amnt: number }> }> = {};
-    
+    // Group transactions by date
+    const groupedData: Record<string, any[]> = {};
     data.forEach(txn => {
       if (txn.status === 'Voided') return;
-      txn.items.forEach((item: any) => {
-        if (!itemStats[item.name]) {
-          itemStats[item.name] = { price: item.price, cashiers: {} };
-        }
-        if (!itemStats[item.name].cashiers[txn.cashier]) {
-          itemStats[item.name].cashiers[txn.cashier] = { qty: 0, amnt: 0 };
-        }
-        itemStats[item.name].cashiers[txn.cashier].qty += item.quantity;
-        itemStats[item.name].cashiers[txn.cashier].amnt += (item.quantity * item.price);
-      });
+      const txnDate = new Date(txn.date);
+      const dateStr = txnDate.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+      if (!groupedData[dateStr]) groupedData[dateStr] = [];
+      groupedData[dateStr].push(txn);
     });
 
-    const itemNames = Object.keys(itemStats).sort();
+    const defaultFont = { name: "Arial", sz: 10 };
+    const boldFont = { name: "Arial", sz: 10, bold: true };
 
     const rows: any[][] = [];
-    rows.push(['Holy Cross of Davao College']);
-    rows.push(['Center for Social Communications and Alumni Affairs']);
-    rows.push(['Sta. Ana Avenue, corner C. de Guzman St., Davao City']);
-    rows.push([]);
-    rows.push(['DAILY SALES REPORT']);
-    rows.push(['HCDC Cross Blazers Café']);
-    rows.push([]);
-
-    const startRow = 7;
-    const dateStr = reportDateFilter 
-      ? new Date(reportDateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-') 
-      : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+    const merges: any[] = [];
     
-    const hr1 = ['Café Item', 'Price', dateStr];
-    for (let i = 0; i < cashiersInData.length * 2 - 1; i++) hr1.push('');
-    hr1.push('Total Qty and Sales', '');
-    rows.push(hr1);
+    // Header section
+    rows.push([{v: 'Holy Cross of Davao College', s: { font: boldFont }}]);
+    rows.push([{v: 'Center for Social Communications and Alumni Affairs', s: { font: boldFont }}]);
+    rows.push([{v: 'Sta. Ana Avenue, corner C. de Guzman St., Davao City', s: { font: defaultFont }}]);
+    rows.push([]);
+    rows.push([{v: 'DAILY SALES REPORT', s: { font: boldFont }}]);
+    rows.push([{v: 'HCDC Cross Blazers Café', s: { font: defaultFont }}]);
+    rows.push([]);
 
-    const hr2 = ['', ''];
-    cashiersInData.forEach(c => { hr2.push(c, ''); });
-    hr2.push('', '');
-    rows.push(hr2);
+    let startRow = 7;
+    const sortedDates = Object.keys(groupedData).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 
-    const hr3 = ['', ''];
-    cashiersInData.forEach(() => { hr3.push('Qty', 'Amnt'); });
-    hr3.push('Qty', 'Amnt');
-    rows.push(hr3);
+    const borderStyle = {
+      top: { style: "thin" },
+      bottom: { style: "thin" },
+      left: { style: "thin" },
+      right: { style: "thin" }
+    };
+    const headerStyle = {
+      font: boldFont,
+      alignment: { horizontal: "center", vertical: "center", wrapText: true },
+      border: borderStyle
+    };
+    const cellStyleRight = {
+      font: defaultFont,
+      alignment: { horizontal: "right", vertical: "center" },
+      border: borderStyle
+    };
+    const cellStyleLeft = {
+      font: defaultFont,
+      alignment: { horizontal: "left", vertical: "center" },
+      border: borderStyle
+    };
 
-    let grandTotalQty = 0;
-    let grandTotalAmnt = 0;
-    const cashierTotals: Record<string, {qty: number, amnt: number}> = {};
-    cashiersInData.forEach(c => cashierTotals[c] = {qty: 0, amnt: 0});
+    const createCell = (value: any, style: any, t?: string, z?: string) => {
+      const cell: any = { v: value, s: style };
+      if (t) cell.t = t;
+      if (z) cell.z = z;
+      return cell;
+    };
 
-    itemNames.forEach(itemName => {
-      const stats = itemStats[itemName];
-      const row = [itemName, stats.price];
-      let itemTotalQty = 0;
-      let itemTotalAmnt = 0;
+    let maxCashiers = 0;
 
-      cashiersInData.forEach(c => {
-        const cStats = stats.cashiers[c] || { qty: 0, amnt: 0 };
-        row.push(cStats.qty || 0);
-        row.push(cStats.amnt || 0);
-        itemTotalQty += cStats.qty;
-        itemTotalAmnt += cStats.amnt;
-        cashierTotals[c].qty += cStats.qty;
-        cashierTotals[c].amnt += cStats.amnt;
+    sortedDates.forEach((dateStr) => {
+      const dailyData = groupedData[dateStr];
+      const cashiersInData = Array.from(new Set(dailyData.map(t => t.cashier))).sort();
+      maxCashiers = Math.max(maxCashiers, cashiersInData.length);
+
+      const itemStats: Record<string, { price: number, cashiers: Record<string, { qty: number, amnt: number }> }> = {};
+      dailyData.forEach(txn => {
+        txn.items.forEach((item: any) => {
+          if (!itemStats[item.name]) {
+            itemStats[item.name] = { price: item.price, cashiers: {} };
+          }
+          if (!itemStats[item.name].cashiers[txn.cashier]) {
+            itemStats[item.name].cashiers[txn.cashier] = { qty: 0, amnt: 0 };
+          }
+          itemStats[item.name].cashiers[txn.cashier].qty += item.quantity;
+          itemStats[item.name].cashiers[txn.cashier].amnt += (item.quantity * item.price);
+        });
       });
 
-      row.push(itemTotalQty);
-      row.push(itemTotalAmnt);
-      grandTotalQty += itemTotalQty;
-      grandTotalAmnt += itemTotalAmnt;
-      rows.push(row);
-    });
+      const itemNames = Object.keys(itemStats).sort();
 
-    const totalRow: any[] = ['', ''];
-    cashiersInData.forEach(c => {
-      totalRow.push(cashierTotals[c].qty);
-      totalRow.push(cashierTotals[c].amnt);
+      const hr1 = [
+        createCell('Café Item', headerStyle),
+        createCell('Price', headerStyle),
+        createCell(dateStr, headerStyle)
+      ];
+      for (let i = 0; i < cashiersInData.length * 2 - 1; i++) hr1.push(createCell('', headerStyle));
+      hr1.push(createCell('Total Qty and Sales', headerStyle), createCell('', headerStyle));
+      rows.push(hr1);
+
+      const hr2 = [createCell('', headerStyle), createCell('', headerStyle)];
+      cashiersInData.forEach(c => { 
+        hr2.push(createCell(c, headerStyle), createCell('', headerStyle)); 
+      });
+      hr2.push(createCell('', headerStyle), createCell('', headerStyle));
+      rows.push(hr2);
+
+      const hr3 = [createCell('', headerStyle), createCell('', headerStyle)];
+      cashiersInData.forEach(() => { 
+        hr3.push(createCell('Qty', headerStyle), createCell('Amnt', headerStyle)); 
+      });
+      hr3.push(createCell('Qty', headerStyle), createCell('Amnt', headerStyle));
+      rows.push(hr3);
+
+      let grandTotalQty = 0;
+      let grandTotalAmnt = 0;
+      const cashierTotals: Record<string, {qty: number, amnt: number}> = {};
+      cashiersInData.forEach(c => cashierTotals[c] = {qty: 0, amnt: 0});
+
+      itemNames.forEach(itemName => {
+        const stats = itemStats[itemName];
+        const row = [
+          createCell(itemName, cellStyleLeft),
+          createCell(stats.price, cellStyleRight, 'n', '#,##0.00')
+        ];
+        let itemTotalQty = 0;
+        let itemTotalAmnt = 0;
+
+        cashiersInData.forEach(c => {
+          const cStats = stats.cashiers[c] || { qty: 0, amnt: 0 };
+          row.push(createCell(cStats.qty || 0, cellStyleRight, 'n', '0.00'));
+          row.push(createCell(cStats.amnt || 0, cellStyleRight, 'n', '#,##0.00'));
+          itemTotalQty += cStats.qty;
+          itemTotalAmnt += cStats.amnt;
+          cashierTotals[c].qty += cStats.qty;
+          cashierTotals[c].amnt += cStats.amnt;
+        });
+
+        row.push(createCell(itemTotalQty, cellStyleRight, 'n', '0.00'));
+        row.push(createCell(itemTotalAmnt, cellStyleRight, 'n', '#,##0.00'));
+        grandTotalQty += itemTotalQty;
+        grandTotalAmnt += itemTotalAmnt;
+        rows.push(row);
+      });
+
+      const totalRow: any[] = [
+        createCell('', { font: defaultFont, border: borderStyle }),
+        createCell('', { font: defaultFont, border: borderStyle })
+      ];
+      cashiersInData.forEach(c => {
+        totalRow.push(createCell(cashierTotals[c].qty, cellStyleRight, 'n', '0.00'));
+        totalRow.push(createCell(cashierTotals[c].amnt, cellStyleRight, 'n', '#,##0.00'));
+      });
+      totalRow.push(createCell(grandTotalQty, cellStyleRight, 'n', '0.00'));
+      totalRow.push(createCell(grandTotalAmnt, { ...cellStyleRight, font: boldFont }, 'n', '#,##0.00'));
+      rows.push(totalRow);
+
+      merges.push(
+        { s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } },
+        { s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 1 } },
+        { s: { r: startRow, c: 2 }, e: { r: startRow, c: 1 + cashiersInData.length * 2 } },
+        { s: { r: startRow, c: 2 + cashiersInData.length * 2 }, e: { r: startRow + 1, c: 3 + cashiersInData.length * 2 } }
+      );
+
+      cashiersInData.forEach((c, i) => {
+        merges.push({ s: { r: startRow + 1, c: 2 + i * 2 }, e: { r: startRow + 1, c: 3 + i * 2 } });
+      });
+
+      startRow += 3 + itemNames.length + 1 + 2; 
+      rows.push([]);
+      rows.push([]);
     });
-    totalRow.push(grandTotalQty);
-    totalRow.push(grandTotalAmnt);
-    rows.push(totalRow);
 
     const ws = XLSX.utils.aoa_to_sheet(rows);
-
-    const merges = [
-      { s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } },
-      { s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 1 } },
-      { s: { r: startRow, c: 2 }, e: { r: startRow, c: 1 + cashiersInData.length * 2 } },
-      { s: { r: startRow, c: 2 + cashiersInData.length * 2 }, e: { r: startRow + 1, c: 3 + cashiersInData.length * 2 } }
-    ];
-
-    cashiersInData.forEach((c, i) => {
-      merges.push({ s: { r: startRow + 1, c: 2 + i * 2 }, e: { r: startRow + 1, c: 3 + i * 2 } });
-    });
     ws['!merges'] = merges;
 
     const wscols = [{ wch: 25 }, { wch: 10 }];
-    for (let i = 0; i < cashiersInData.length * 2; i++) wscols.push({ wch: 12 });
-    wscols.push({ wch: 12 }, { wch: 12 });
+    for (let i = 0; i < maxCashiers * 2; i++) wscols.push({ wch: 12 });
+    wscols.push({ wch: 12 }, { wch: 15 });
     ws['!cols'] = wscols;
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
-    XLSX.writeFile(wb, `AlumniCafe_Sales_${dateStr}.xlsx`);
+    
+    const exportDateStr = reportDateFilter 
+      ? new Date(reportDateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-') 
+      : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
+      
+    XLSX.writeFile(wb, `AlumniCafe_Sales_${exportDateStr}.xlsx`);
   };
 
   const generateCsvReport = (data: Record<string, any>[]) => {
