@@ -20,13 +20,18 @@ export interface TransactionRecord {
   total: number;
   cashTendered: number;
   change: number;
+  customerName?: string;
+  customerIdNumber?: string;
   status?: 'Completed' | 'Voided';
+  paymentMethod?: 'Cash' | 'OR';
+  orNumber?: string;
 }
 
 const TRANSACTIONS_COLLECTION = 'transactions';
 
 export async function saveTransaction(txn: TransactionRecord): Promise<void> {
-  const finalTxn = { ...txn, status: txn.status || 'Completed' };
+  const finalTxn: any = { ...txn, status: txn.status || 'Completed' };
+  Object.keys(finalTxn).forEach(key => finalTxn[key] === undefined && delete finalTxn[key]);
   await setDoc(doc(db, TRANSACTIONS_COLLECTION, finalTxn.id), finalTxn);
 }
 

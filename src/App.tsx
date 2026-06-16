@@ -4,6 +4,7 @@ import { saveTransaction, updateCashierNames } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
 import { getInventory, saveInventory, Inventory } from './inventoryStorage';
+import { saveCashCount } from './cashCountStorage';
 import {
   Coffee,
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   Printer,
   X,
   CreditCard,
+  Receipt,
   Search,
   ShoppingCart,
   Tag,
@@ -68,16 +70,42 @@ export default function App() {
   const cashierName = localStorage.getItem('cashier_name') || 'Staff 01';
 
   const handleLogout = () => {
+    setShowCashCountModal(true);
+  };
+
+  const confirmLogout = async () => {
+    const now = new Date();
+    await saveCashCount({
+      id: `CC-${now.getTime()}`,
+      date: now.toISOString(),
+      time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      cashier: cashierName,
+      amount: totalCashCount,
+      totalORAmount: parseFloat(totalORAmount) || 0,
+      denominations: cashDenominations
+    });
     localStorage.removeItem('cashier_auth');
     localStorage.removeItem('cashier_name');
     navigate('/login');
+  };
+
+  const cancelLogout = () => {
+    setShowCashCountModal(false);
+    setTotalORAmount('');
+    setCashDenominations({
+      '1000': 0, '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0, '5': 0, '1': 0, 'coins': 0
+    });
   };
 
   // --- States ---
   const [currentCategory, setCurrentCategory] = useState('All Items');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discountType, setDiscountType] = useState<DiscountType>('REGULAR');
+  const [customerName, setCustomerName] = useState('');
+  const [customerIdNumber, setCustomerIdNumber] = useState('');
   const [cashTendered, setCashTendered] = useState<string>('');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'OR'>('Cash');
+  const [orNumber, setOrNumber] = useState('');
   const [time, setTime] = useState(new Date());
   const [txnNumber, setTxnNumber] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
@@ -90,6 +118,19 @@ export default function App() {
   const [inventory, setInventory] = useState<Inventory>([]);
   
   const [newProduct, setNewProduct] = useState({ name: '', price: 0, category: 'Coffee', icon: '☕' });
+
+  const [showCashCountModal, setShowCashCountModal] = useState(false);
+  const [totalORAmount, setTotalORAmount] = useState<string>('');
+  const [cashDenominations, setCashDenominations] = useState<Record<string, number>>({
+    '1000': 0, '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0, '5': 0, '1': 0, 'coins': 0
+  });
+
+  const totalCashCount = useMemo(() => {
+    return Object.entries(cashDenominations).reduce((sum, [den, qty]) => {
+      const val = den === 'coins' ? 1 : parseInt(den);
+      return sum + (val * qty);
+    }, 0);
+  }, [cashDenominations]);
 
   // --- Effects ---
   useEffect(() => {
@@ -220,6 +261,8 @@ export default function App() {
     if (confirm('Are you sure you want to clear the current order?')) {
       setCart([]);
       setDiscountType('REGULAR');
+      setCustomerName('');
+      setCustomerIdNumber('');
       setCashTendered('');
     }
   };
@@ -230,8 +273,13 @@ export default function App() {
       return;
     }
     const cash = parseFloat(cashTendered) || 0;
-    if (cash < total) {
+    
+    if (paymentMethod === 'Cash' && cash < total) {
       alert('Insufficient cash tendered!');
+      return;
+    }
+    if (paymentMethod === 'OR' && !orNumber.trim()) {
+      alert('Please enter the OR number!');
       return;
     }
 
@@ -254,8 +302,12 @@ export default function App() {
       discountAmount,
       vatAmount,
       total,
-      cashTendered: cash,
-      change: Math.max(0, cash - total),
+      customerName: discountType !== 'REGULAR' ? customerName : undefined,
+      customerIdNumber: discountType !== 'REGULAR' ? customerIdNumber : undefined,
+      cashTendered: paymentMethod === 'Cash' ? cash : total,
+      change: paymentMethod === 'Cash' ? Math.max(0, cash - total) : 0,
+      paymentMethod,
+      orNumber: paymentMethod === 'OR' ? orNumber.trim() : undefined,
     });
 
     // Deduct inventory
@@ -275,7 +327,11 @@ export default function App() {
     sessionStorage.setItem('lastTxn', parseInt(lastNum).toString());
     setCart([]);
     setDiscountType('REGULAR');
+    setCustomerName('');
+    setCustomerIdNumber('');
     setCashTendered('');
+    setPaymentMethod('Cash');
+    setOrNumber('');
     setShowReceipt(false);
     setShowPaymentModal(false);
   };
@@ -620,6 +676,25 @@ export default function App() {
               </div>
             </div>
 
+            {discountType !== 'REGULAR' && (
+              <div className="mb-6 space-y-3">
+                <input
+                  type="text"
+                  placeholder="Customer Name"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full text-sm py-2 px-4 rounded-xl border border-gray-200 focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue transition-all"
+                />
+                <input
+                  type="text"
+                  placeholder="ID Number"
+                  value={customerIdNumber}
+                  onChange={(e) => setCustomerIdNumber(e.target.value)}
+                  className="w-full text-sm py-2 px-4 rounded-xl border border-gray-200 focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue transition-all"
+                />
+              </div>
+            )}
+
             {/* Totals Summary */}
             <div className="space-y-2 mb-6">
               <div className="flex justify-between text-xs font-bold text-gray-400">
@@ -646,7 +721,7 @@ export default function App() {
 
             <button
               onClick={() => cart.length > 0 && setShowPaymentModal(true)}
-              disabled={cart.length === 0}
+              disabled={cart.length === 0 || (discountType !== 'REGULAR' && (!customerName || !customerIdNumber))}
               className="w-full h-16 bg-hcdc-red hover:bg-[#A01E1F] text-white font-black rounded-2xl shadow-xl shadow-hcdc-red/30 flex items-center justify-center gap-3 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 disabled:shadow-none text-base tracking-wide group"
             >
               <CreditCard className="w-5 h-5 group-hover:rotate-12 transition-transform" /> PROCEED TO CHECKOUT
@@ -677,47 +752,85 @@ export default function App() {
               </div>
 
               <div className="p-10 space-y-8">
-                <div className="space-y-4">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
-                    <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
-                  </label>
-                  <div className="relative group">
-                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
+                <div className="flex bg-gray-100 p-1 rounded-2xl">
+                  <button
+                    onClick={() => setPaymentMethod('Cash')}
+                    className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${paymentMethod === 'Cash' ? 'bg-white shadow-sm text-hcdc-blue' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    Cash
+                  </button>
+                  <button
+                    onClick={() => setPaymentMethod('OR')}
+                    className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${paymentMethod === 'OR' ? 'bg-white shadow-sm text-hcdc-blue' : 'text-gray-400 hover:text-gray-600'}`}
+                  >
+                    Official Receipt (OR)
+                  </button>
+                </div>
+
+                {paymentMethod === 'Cash' ? (
+                  <>
+                    <div className="space-y-4">
+                      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+                        <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
+                        <input
+                          autoFocus
+                          type="number"
+                          placeholder="Enter amount"
+                          value={cashTendered}
+                          onChange={(e) => setCashTendered(e.target.value)}
+                          className="w-full h-20 pl-14 pr-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-4xl transition-all shadow-inner placeholder:text-hcdc-blue/10"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="bg-gray-50 rounded-3xl p-6 flex justify-between items-center border border-gray-100">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Change to return</p>
+                        <p className={`text-3xl font-black tracking-tighter tabular-nums ${change > 0 ? 'text-green-600' : 'text-gray-200'}`}>
+                          {formatCurrency(change)}
+                        </p>
+                      </div>
+                      {cash >= total && total > 0 && (
+                        <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" /> Paid
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-4">
+                    <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+                      <Receipt className="w-3 h-3 text-hcdc-blue" /> OR Number
+                    </label>
                     <input
                       autoFocus
-                      type="number"
-                      placeholder="Enter amount"
-                      value={cashTendered}
-                      onChange={(e) => setCashTendered(e.target.value)}
-                      className="w-full h-20 pl-14 pr-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-4xl transition-all shadow-inner placeholder:text-hcdc-blue/10"
+                      type="text"
+                      placeholder="e.g. 123456"
+                      value={orNumber}
+                      onChange={(e) => setOrNumber(e.target.value)}
+                      className="w-full h-20 px-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-2xl transition-all shadow-inner placeholder:text-hcdc-blue/30"
                     />
+                    {orNumber.trim() && (
+                      <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 justify-center mt-4">
+                        <CheckCircle2 className="w-4 h-4" /> Valid OR Payment
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
 
-                <div className="bg-gray-50 rounded-3xl p-6 flex justify-between items-center border border-gray-100">
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Change to return</p>
-                    <p className={`text-3xl font-black tracking-tighter tabular-nums ${change > 0 ? 'text-green-600' : 'text-gray-200'}`}>
-                      {formatCurrency(change)}
-                    </p>
-                  </div>
-                  {cash >= total && total > 0 && (
-                    <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> Paid
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex gap-4">
+                <div className="flex gap-4 mt-8">
                   <button
-                    onClick={() => { setShowPaymentModal(false); setCashTendered(''); }}
+                    onClick={() => { setShowPaymentModal(false); setCashTendered(''); setOrNumber(''); setPaymentMethod('Cash'); }}
                     className="flex-1 h-16 bg-white border-2 border-gray-100 text-gray-400 font-black rounded-2xl hover:bg-gray-50 hover:text-gray-600 transition-all uppercase tracking-widest text-xs"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={processPayment}
-                    disabled={cash < total || total <= 0}
+                    disabled={(paymentMethod === 'Cash' ? cash < total : !orNumber.trim()) || total <= 0}
                     className="flex-[2] h-16 bg-hcdc-red hover:bg-[#A01E1F] text-white font-black rounded-2xl shadow-xl shadow-hcdc-red/30 flex items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 disabled:shadow-none text-lg uppercase tracking-wide"
                   >
                     Confirm Payment
@@ -793,20 +906,30 @@ export default function App() {
                       <span>TOTAL:</span>
                       <span>{formatCurrency(total)}</span>
                     </div>
-                    <div className="flex justify-between pt-1"><span>Cash:</span> <span>{formatCurrency(cash)}</span></div>
-                    <div className="flex justify-between"><span>Change:</span> <span>{formatCurrency(change)}</span></div>
+                    <div className="flex justify-between pt-1">
+                      <span>{paymentMethod === 'OR' ? 'OR Payment:' : 'Cash:'}</span> 
+                      <span>{formatCurrency(paymentMethod === 'OR' ? total : cash)}</span>
+                    </div>
+                    {paymentMethod === 'OR' && orNumber && (
+                      <div className="flex justify-between"><span>OR Number:</span> <span>{orNumber}</span></div>
+                    )}
+                    {paymentMethod === 'Cash' && (
+                      <div className="flex justify-between"><span>Change:</span> <span>{formatCurrency(change)}</span></div>
+                    )}
                   </div>
 
                   <div className="border-t border-dashed border-gray-400 py-3 text-center space-y-1">
                     {discountType !== 'REGULAR' && (
                       <div className="mb-2">
                         <p className="font-bold">Discount: {discountType} ({discountRate * 100}%)</p>
-                        <p className="text-[9px] leading-tight opacity-70">
+                        <p className="text-[9px] leading-tight opacity-70 whitespace-pre-wrap">
                           {discountType === 'ALUMNI' ?
                             'Privilege under HCDC\nAlumni Privilege Program' :
                             `Privilege under ${discountType === 'PWD' ? 'RA 7277' : 'RA 9994'}`
                           }
                         </p>
+                        {customerName && <p className="text-[10px] mt-1">Name: {customerName}</p>}
+                        {customerIdNumber && <p className="text-[10px]">ID No: {customerIdNumber}</p>}
                       </div>
                     )}
                     <p className="font-bold text-[12px] leading-tight mt-4 italic">Salamat sa inyong pagbisita!</p>
@@ -835,6 +958,84 @@ export default function App() {
                     className="px-6 h-12 bg-white border-2 border-gray-200 text-gray-500 font-bold rounded-xl hover:bg-gray-50 flex items-center justify-center"
                   >
                     CLOSE
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CASH COUNT MODAL */}
+      <AnimatePresence>
+        {showCashCountModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 my-auto"
+            >
+              <div className="bg-hcdc-blue p-8 text-white text-center shrink-0">
+                <h3 className="text-xl font-black">End of Shift Cash Count</h3>
+                <p className="text-sm text-white/60 mt-1 uppercase tracking-widest font-bold">
+                  Enter quantities per denomination
+                </p>
+                <div className="mt-4 text-4xl font-black tracking-tighter">
+                  {formatCurrency(totalCashCount)}
+                </div>
+              </div>
+              <div className="p-8 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  {['1000', '500', '200', '100', '50', '20', '10', '5', '1', 'coins'].map(den => (
+                    <div key={den} className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+                      <div className="w-12 text-right font-black text-gray-400 text-[10px] uppercase tracking-widest">
+                        {den === 'coins' ? 'Coins' : `₱${den}`}
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={cashDenominations[den] || ''}
+                        onChange={(e) => setCashDenominations({ ...cashDenominations, [den]: parseInt(e.target.value) || 0 })}
+                        className="flex-1 w-full h-10 px-2 bg-white border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold text-center text-sm transition-all focus:ring-0"
+                        placeholder="0"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-4 border-t border-gray-100 mt-6">
+                  <div className="flex items-center gap-3 bg-hcdc-light-blue/20 p-3 rounded-2xl border border-hcdc-blue/20">
+                    <div className="text-right font-black text-hcdc-blue text-[10px] uppercase tracking-widest leading-tight">
+                      Total OR<br/>Amount
+                    </div>
+                    <div className="relative flex-1">
+                      <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-hcdc-blue">₱</div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={totalORAmount}
+                        onChange={(e) => setTotalORAmount(e.target.value)}
+                        className="w-full h-12 pl-10 pr-4 bg-white border-2 border-transparent focus:border-hcdc-blue rounded-xl font-black text-left text-lg transition-all focus:ring-0 text-hcdc-blue"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3 pt-4 border-t border-gray-100 mt-6">
+                  <button
+                    onClick={cancelLogout}
+                    className="flex-1 h-12 bg-gray-50 text-gray-400 font-bold rounded-xl hover:bg-gray-100 transition-all uppercase tracking-widest text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmLogout}
+                    disabled={totalCashCount === 0}
+                    className="flex-[2] h-12 bg-hcdc-red text-white font-bold rounded-xl hover:bg-[#A01E1F] shadow-lg shadow-hcdc-red/20 transition-all disabled:opacity-30 uppercase tracking-widest text-xs"
+                  >
+                    Submit & Logout
                   </button>
                 </div>
               </div>

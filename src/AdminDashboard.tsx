@@ -42,13 +42,15 @@ import {
 } from 'recharts';
 import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, MenuItem, getMenuCategories, addMenuCategory, deleteMenuCategory } from './menuStorage';
 import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
-import { getCashiers, addCashier, updateCashier, deleteCashier, CashierAccount } from './cashierStorage';
+import { getCashiers, addCashier, updateCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
 import { getInventory, saveInventory, deleteInventoryItem, Inventory, getInventoryLogs, addInventoryLog, InventoryLog } from './inventoryStorage';
+import { getCashCounts, CashCountRecord } from './cashCountStorage';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'analytics' | 'cashiers' | 'reports' | 'menu' | 'inventory'>('analytics');
-  const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'specific'>('weekly');
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'specific' | 'range'>('weekly');
   const [analyticsSpecificDate, setAnalyticsSpecificDate] = useState('');
+  const [analyticsSpecificDateEnd, setAnalyticsSpecificDateEnd] = useState('');
   const [time, setTime] = useState(new Date());
 
   // Menu management state
@@ -71,20 +73,27 @@ export default function AdminDashboard() {
   const [showCashierModal, setShowCashierModal] = useState(false);
   const [editingCashier, setEditingCashier] = useState<CashierAccount | null>(null);
   const [cashierForm, setCashierForm] = useState({ name: '', usernamePrefix: '', role: 'Cashier' });
+  const [cashCounts, setCashCounts] = useState<CashCountRecord[]>([]);
+  const [selectedCashCount, setSelectedCashCount] = useState<CashCountRecord | null>(null);
 
   // Confirmation Modals State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<{ id: number | string; type: 'menu' | 'cashier' | 'inventory'; name: string } | null>(null);
 
   // Report state
+  const [reportPeriod, setReportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'specific' | 'range'>('daily');
   const [reportDateFilter, setReportDateFilter] = useState('');
+  const [reportDateFilterEnd, setReportDateFilterEnd] = useState('');
   const [reportShiftFilter, setReportShiftFilter] = useState('All');
   const [reportCashierFilter, setReportCashierFilter] = useState('All');
 
   // Inventory state
   const [inventory, setInventory] = useState<Inventory>([]);
   const [inventoryLogs, setInventoryLogs] = useState<InventoryLog[]>([]);
+  const [inventoryLogPeriod, setInventoryLogPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'specific'>('all');
+  const [inventorySpecificDate, setInventorySpecificDate] = useState('');
   const [addInventoryForm, setAddInventoryForm] = useState({ name: '', quantity: '', unit: 'g' });
+  const [isAddingNewStock, setIsAddingNewStock] = useState(false);
 
   // Inventory edit/delete (password-protected)
   const [showInvAuthModal, setShowInvAuthModal] = useState(false);
@@ -109,13 +118,14 @@ export default function AdminDashboard() {
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      const [m, t, c, cat, i, l] = await Promise.all([
+      const [m, t, c, cat, i, l, cc] = await Promise.all([
         getMenuItems(),
         getTransactions(),
         getCashiers(),
         getMenuCategories(),
         getInventory(),
-        getInventoryLogs()
+        getInventoryLogs(),
+        getCashCounts()
       ]);
       if (isMounted) {
         setMenuItems(m);
@@ -124,6 +134,7 @@ export default function AdminDashboard() {
         setCategories(cat);
         setInventory(i);
         setInventoryLogs(l);
+        setCashCounts(cc);
       }
     };
     loadData();
@@ -219,6 +230,7 @@ export default function AdminDashboard() {
       await saveInventory(updated);
       setInventory(updated);
       setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
+      setIsAddingNewStock(false);
     }
   };
 
@@ -328,6 +340,12 @@ export default function AdminDashboard() {
       role: acc.role
     });
     setShowCashierModal(true);
+  };
+
+  const handleToggleCashierStatus = async (id: number, isActive: boolean, name: string) => {
+    if (confirm(`Are you sure you want to ${isActive ? 'reactivate' : 'deactivate'} the account for ${name}?`)) {
+      setCashiers(await toggleCashierStatus(id, isActive));
+    }
   };
 
   const handleDeleteCashier = (id: number, name: string) => {
@@ -582,11 +600,16 @@ export default function AdminDashboard() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sales Report");
     
-    const exportDateStr = reportDateFilter 
-      ? new Date(reportDateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-') 
-      : new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-');
-      
-    XLSX.writeFile(wb, `AlumniCafe_Sales_${exportDateStr}.xlsx`);
+    let periodStr = reportPeriod;
+    if (reportPeriod === 'specific') {
+      periodStr = reportDateFilter ? new Date(reportDateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-') : 'all';
+    } else if (reportPeriod === 'range') {
+      periodStr = (reportDateFilter && reportDateFilterEnd)
+        ? `${new Date(reportDateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-')}_to_${new Date(reportDateFilterEnd).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-')}`
+        : reportDateFilter ? new Date(reportDateFilter).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }).replace(/ /g, '-') : 'all';
+    }
+
+    XLSX.writeFile(wb, `AlumniCafe_Sales_${periodStr}.xlsx`);
   };
 
   const generateCsvReport = (data: Record<string, any>[]) => {
@@ -606,12 +629,14 @@ export default function AdminDashboard() {
   };
 
   const exportCSV = () => {
-    const headers = ['Transaction ID', 'Date', 'Time', 'Cashier', 'Subtotal', 'VAT', 'Discount', 'Total', 'Cash', 'Change'];
+    const headers = ['Transaction ID', 'Date', 'Time', 'Cashier', 'Customer Name', 'ID No.', 'Subtotal', 'VAT', 'Discount', 'Total', 'Cash', 'Change'];
     const rows = sortedTransactions.map(t => [
       t.id,
       t.date.split('T')[0],
       t.time,
       t.cashier,
+      t.customerName || 'N/A',
+      t.customerIdNumber || 'N/A',
       t.subtotal,
       t.vatAmount,
       t.discountAmount,
@@ -623,34 +648,53 @@ export default function AdminDashboard() {
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `alumnicafe_sales_${reportDateFilter || 'all'}.csv`;
+    let periodStr = reportPeriod;
+    if (reportPeriod === 'specific') {
+      periodStr = reportDateFilter || 'all';
+    } else if (reportPeriod === 'range') {
+      periodStr = (reportDateFilter && reportDateFilterEnd) ? `${reportDateFilter}_to_${reportDateFilterEnd}` : (reportDateFilter || 'all');
+    }
+    link.download = `alumnicafe_sales_${periodStr}.csv`;
     link.click();
   };
 
+  const filteredInventoryLogs = useMemo(() => {
+    const now = new Date();
+    return inventoryLogs.filter(log => {
+      if (inventoryLogPeriod === 'all') return true;
+      const tDate = new Date(log.date);
+      if (inventoryLogPeriod === 'daily') {
+        return log.date.startsWith(now.toISOString().slice(0, 10));
+      } else if (inventoryLogPeriod === 'weekly') {
+        const weekAgo = new Date();
+        weekAgo.setDate(now.getDate() - 7);
+        return tDate >= weekAgo;
+      } else if (inventoryLogPeriod === 'monthly') {
+        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      } else if (inventoryLogPeriod === 'specific') {
+        return inventorySpecificDate ? log.date.startsWith(inventorySpecificDate) : true;
+      }
+      return true;
+    });
+  }, [inventoryLogs, inventoryLogPeriod, inventorySpecificDate]);
+
   const exportInventoryCSV = () => {
-    const headers = ['Log ID', 'Date', 'Time', 'Added Coffee (g)', 'Added Milk (ml)', 'Estimated Servings'];
-    const rows = [...inventoryLogs].sort((a, b) => b.id - a.id).map(log => {
-      const coffeeServings = Math.floor(log.addedCoffeeGrams / 18);
-      const milkServings = Math.floor(log.addedMilkAmount / 150);
-      const servingsText = [
-        coffeeServings > 0 ? `${coffeeServings} coffee` : '',
-        milkServings > 0 ? `${milkServings} milk` : ''
-      ].filter(Boolean).join(' & ') || '0';
-      
+    const headers = ['Log ID', 'Date', 'Time', 'Stock Name', 'Added Quantity', 'Unit'];
+    const rows = [...filteredInventoryLogs].sort((a, b) => b.id - a.id).map(log => {
       return [
-        log.id,
+        log.id.toString(),
         log.date.split('T')[0],
         log.time,
-        log.addedCoffeeGrams,
-        log.addedMilkAmount,
-        servingsText
+        log.stockName,
+        log.addedQuantity.toString(),
+        log.unit
       ];
     });
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `alumnicafe_inventory_log.csv`;
+    link.download = `alumnicafe_inventory_log_${inventoryLogPeriod === 'specific' ? inventorySpecificDate : inventoryLogPeriod}.csv`;
     link.click();
   };
 
@@ -680,6 +724,19 @@ export default function AdminDashboard() {
         return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
       } else if (analyticsPeriod === 'specific') {
         return analyticsSpecificDate ? t.date.startsWith(analyticsSpecificDate) : true;
+      } else if (analyticsPeriod === 'range') {
+        if (analyticsSpecificDate && analyticsSpecificDateEnd) {
+          const start = new Date(analyticsSpecificDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(analyticsSpecificDateEnd);
+          end.setHours(23, 59, 59, 999);
+          return tDate >= start && tDate <= end;
+        } else if (analyticsSpecificDate) {
+          return t.date.startsWith(analyticsSpecificDate);
+        } else if (analyticsSpecificDateEnd) {
+          return t.date.startsWith(analyticsSpecificDateEnd);
+        }
+        return true;
       }
       return true;
     });
@@ -711,12 +768,30 @@ export default function AdminDashboard() {
           specific.setDate(specific.getDate() - 1);
           return t.date.startsWith(specific.toISOString().slice(0, 10));
         }
+      } else if (analyticsPeriod === 'range') {
+        if (analyticsSpecificDate && analyticsSpecificDateEnd) {
+          const start = new Date(analyticsSpecificDate);
+          start.setHours(0, 0, 0, 0);
+          const end = new Date(analyticsSpecificDateEnd);
+          end.setHours(23, 59, 59, 999);
+          
+          const diffTime = Math.abs(end.getTime() - start.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          
+          const prevStart = new Date(start);
+          prevStart.setDate(prevStart.getDate() - diffDays - 1);
+          const prevEnd = new Date(start);
+          prevEnd.setDate(prevEnd.getDate() - 1);
+          prevEnd.setHours(23, 59, 59, 999);
+          
+          return tDate >= prevStart && tDate <= prevEnd;
+        }
       }
       return false;
     });
 
     return { filteredTransactions: curr, previousTransactions: prev };
-  }, [transactions, analyticsPeriod, analyticsSpecificDate]);
+  }, [transactions, analyticsPeriod, analyticsSpecificDate, analyticsSpecificDateEnd]);
 
   // Calculate KPIs dynamically
   const totalSalesPeriod = filteredTransactions.reduce((sum, t) => sum + t.total, 0);
@@ -746,7 +821,7 @@ export default function AdminDashboard() {
 
   // Calculate Revenue Trends
   const trendData = useMemo(() => {
-    if (analyticsPeriod === 'daily' || analyticsPeriod === 'specific') {
+    if (analyticsPeriod === 'daily' || analyticsPeriod === 'specific' || analyticsPeriod === 'range') {
       const hourBuckets = Array.from({ length: 14 }, (_, i) => {
         const hour = i + 7; // 7 AM to 8 PM
         const displayHour = hour > 12 ? `${hour - 12} PM` : hour === 12 ? '12 PM' : `${hour} AM`;
@@ -834,9 +909,36 @@ export default function AdminDashboard() {
 
   // Sort and filter transactions for the reports table
   let filteredReports = transactions;
-  if (reportDateFilter) {
-    filteredReports = filteredReports.filter(t => t.date.startsWith(reportDateFilter));
-  }
+  const now = new Date();
+
+  filteredReports = filteredReports.filter(t => {
+    const tDate = new Date(t.date);
+    if (reportPeriod === 'daily') {
+      return t.date.startsWith(now.toISOString().slice(0, 10));
+    } else if (reportPeriod === 'weekly') {
+      const weekAgo = new Date();
+      weekAgo.setDate(now.getDate() - 7);
+      return tDate >= weekAgo;
+    } else if (reportPeriod === 'monthly') {
+      return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+    } else if (reportPeriod === 'specific') {
+      return reportDateFilter ? t.date.startsWith(reportDateFilter) : true;
+    } else if (reportPeriod === 'range') {
+      if (reportDateFilter && reportDateFilterEnd) {
+        const start = new Date(reportDateFilter);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(reportDateFilterEnd);
+        end.setHours(23, 59, 59, 999);
+        return tDate >= start && tDate <= end;
+      } else if (reportDateFilter) {
+        return t.date.startsWith(reportDateFilter);
+      } else if (reportDateFilterEnd) {
+        return t.date.startsWith(reportDateFilterEnd);
+      }
+      return true;
+    }
+    return true;
+  });
   
   if (reportShiftFilter !== 'All') {
     filteredReports = filteredReports.filter(t => {
@@ -958,8 +1060,25 @@ export default function AdminDashboard() {
                     />
                   </div>
                 )}
+                {analyticsPeriod === 'range' && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={analyticsSpecificDate}
+                      onChange={(e) => setAnalyticsSpecificDate(e.target.value)}
+                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px]"
+                    />
+                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">to</span>
+                    <input
+                      type="date"
+                      value={analyticsSpecificDateEnd}
+                      onChange={(e) => setAnalyticsSpecificDateEnd(e.target.value)}
+                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px]"
+                    />
+                  </div>
+                )}
                 <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100">
-                  {(['daily', 'weekly', 'monthly', 'specific'] as const).map(period => (
+                  {(['daily', 'weekly', 'monthly', 'specific', 'range'] as const).map(period => (
                     <button
                       key={period}
                       onClick={() => setAnalyticsPeriod(period)}
@@ -1110,8 +1229,9 @@ export default function AdminDashboard() {
 
           {/* --- CASHIERS TAB --- */}
           {activeTab === 'cashiers' && (
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+            <div className="space-y-8">
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                 <div>
                   <h3 className="text-xl font-black text-gray-800">Manage Accounts</h3>
                   <p className="text-xs text-gray-500 font-medium mt-1">Add, edit, or disable cashier access.</p>
@@ -1128,6 +1248,7 @@ export default function AdminDashboard() {
                       <th className="p-6 font-black">Name</th>
                       <th className="p-6 font-black">Username</th>
                       <th className="p-6 font-black">Role</th>
+                      <th className="p-6 font-black">Status</th>
                       <th className="p-6 font-black">Last Login</th>
                       <th className="p-6 font-black text-right">Actions</th>
                     </tr>
@@ -1150,24 +1271,88 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="p-6">
+                          <span className={`text-[11px] font-black uppercase tracking-wider px-3 py-1 rounded-lg ${acc.isActive !== false ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {acc.isActive !== false ? 'Active' : 'Deactivated'}
+                          </span>
+                        </td>
+                        <td className="p-6">
                           <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">
                             {acc.lastLogin || 'Never logged in'}
                           </span>
                         </td>
 
                         <td className="p-6 text-right flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => openEditCashier(acc)} className="p-2 text-hcdc-blue bg-hcdc-light-blue hover:bg-hcdc-blue hover:text-white rounded-xl transition-all">
+                          <button onClick={() => openEditCashier(acc)} className="p-2 text-hcdc-blue bg-hcdc-light-blue hover:bg-hcdc-blue hover:text-white rounded-xl transition-all" title="Edit">
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleDeleteCashier(acc.id, acc.name)} className="p-2 text-hcdc-red bg-red-50 hover:bg-hcdc-red hover:text-white rounded-xl transition-all">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          {acc.isActive !== false ? (
+                            <button onClick={() => handleToggleCashierStatus(acc.id, false, acc.name)} className="p-2 text-orange-500 bg-orange-50 hover:bg-orange-500 hover:text-white rounded-xl transition-all" title="Deactivate">
+                              <Minus className="w-4 h-4" />
+                            </button>
+                          ) : (
+                            <button onClick={() => handleToggleCashierStatus(acc.id, true, acc.name)} className="p-2 text-green-500 bg-green-50 hover:bg-green-500 hover:text-white rounded-xl transition-all" title="Reactivate">
+                              <CheckCircle2 className="w-4 h-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mt-8">
+              <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-black text-gray-800">Cash Count History</h3>
+                  <p className="text-xs text-gray-500 font-medium mt-1">End of shift cash drawer counts reported by cashiers.</p>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto max-h-[400px]">
+                <table className="w-full text-left">
+                  <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10">
+                    <tr className="border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black">
+                      <th className="p-6">Date</th>
+                      <th className="p-6">Time</th>
+                      <th className="p-6">Cashier</th>
+                      <th className="p-6 text-right">Cash Amount (₱)</th>
+                      <th className="p-6 text-right">OR Amount (₱)</th>
+                      <th className="p-6 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {cashCounts.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-6 text-center text-gray-400 font-medium">No cash counts recorded.</td>
+                      </tr>
+                    ) : (
+                      cashCounts.map((cc) => (
+                        <tr key={cc.id} className="hover:bg-gray-50/50 transition-colors">
+                          <td className="p-6 text-sm font-bold text-gray-800">{cc.date.split('T')[0]}</td>
+                          <td className="p-6 text-sm font-mono text-gray-500">{cc.time}</td>
+                          <td className="p-6 text-sm font-bold text-gray-700">{cc.cashier}</td>
+                          <td className="p-6 text-right font-black text-hcdc-blue">
+                            {cc.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-6 text-right font-black text-hcdc-red">
+                            {(cc.totalORAmount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="p-6 text-center">
+                            <button
+                              onClick={() => setSelectedCashCount(cc)}
+                              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all"
+                            >
+                              View Details
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
             </div>
           )}
 
@@ -1180,25 +1365,60 @@ export default function AdminDashboard() {
                   <p className="text-xs text-gray-500 font-medium mt-1">Detailed log of all sales.</p>
                 </div>
                 <div className="flex gap-3 items-center">
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="date"
-                      value={reportDateFilter}
-                      onChange={(e) => setReportDateFilter(e.target.value)}
-                      className="bg-white border-2 border-gray-100 text-gray-600 pl-10 pr-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
-                    />
-                    {reportDateFilter && (
+                  <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                    {(['daily', 'weekly', 'monthly', 'specific', 'range'] as const).map(period => (
                       <button
-                        onClick={() => setReportDateFilter('')}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-hcdc-red"
+                        key={period}
+                        onClick={() => setReportPeriod(period)}
+                        className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${reportPeriod === period ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                          }`}
                       >
-                        <X className="w-4 h-4" />
+                        {period}
                       </button>
-                    )}
+                    ))}
                   </div>
+
+                  {reportPeriod === 'specific' && (
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                      </div>
+                      <input
+                        type="date"
+                        value={reportDateFilter}
+                        onChange={(e) => setReportDateFilter(e.target.value)}
+                        className="bg-white border-2 border-gray-100 text-gray-600 pl-10 pr-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {reportPeriod === 'range' && (
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                        </div>
+                        <input
+                          type="date"
+                          value={reportDateFilter}
+                          onChange={(e) => setReportDateFilter(e.target.value)}
+                          className="bg-white border-2 border-gray-100 text-gray-600 pl-10 pr-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
+                        />
+                      </div>
+                      <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">to</span>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                          <Calendar className="w-4 h-4 text-gray-400" />
+                        </div>
+                        <input
+                          type="date"
+                          value={reportDateFilterEnd}
+                          onChange={(e) => setReportDateFilterEnd(e.target.value)}
+                          className="bg-white border-2 border-gray-100 text-gray-600 pl-10 pr-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
                   
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1447,13 +1667,37 @@ export default function AdminDashboard() {
                   <div className="space-y-4">
                     <div>
                       <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Name of Stock</label>
-                      <input
-                        type="text"
-                        value={addInventoryForm.name}
-                        onChange={(e) => setAddInventoryForm({ ...addInventoryForm, name: e.target.value })}
-                        className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all"
-                        placeholder="e.g. Sugar, Cups"
-                      />
+                      <select
+                        value={isAddingNewStock ? 'NEW_STOCK' : addInventoryForm.name}
+                        onChange={(e) => {
+                          if (e.target.value === 'NEW_STOCK') {
+                            setIsAddingNewStock(true);
+                            setAddInventoryForm({ ...addInventoryForm, name: '', unit: 'g' });
+                          } else {
+                            setIsAddingNewStock(false);
+                            const selectedStock = inventory.find(i => i.name === e.target.value);
+                            setAddInventoryForm({ ...addInventoryForm, name: e.target.value, unit: selectedStock?.unit || 'g' });
+                          }
+                        }}
+                        className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mb-3 appearance-none"
+                      >
+                        <option value="" disabled>Select an existing stock</option>
+                        {inventory.map(stock => (
+                          <option key={stock.id} value={stock.name}>{stock.name}</option>
+                        ))}
+                        <option value="NEW_STOCK" className="font-bold text-hcdc-blue">+ Add New Stock...</option>
+                      </select>
+                      
+                      {isAddingNewStock && (
+                        <input
+                          type="text"
+                          value={addInventoryForm.name}
+                          onChange={(e) => setAddInventoryForm({ ...addInventoryForm, name: e.target.value })}
+                          className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mt-2"
+                          placeholder="Type new stock name..."
+                          autoFocus
+                        />
+                      )}
                     </div>
                     <div className="flex gap-4">
                       <div className="flex-1">
@@ -1470,8 +1714,9 @@ export default function AdminDashboard() {
                         <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Unit</label>
                         <select
                           value={addInventoryForm.unit}
+                          disabled={!isAddingNewStock && !!addInventoryForm.name}
                           onChange={(e) => setAddInventoryForm({ ...addInventoryForm, unit: e.target.value })}
-                          className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all"
+                          className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all disabled:opacity-50 appearance-none"
                         >
                           <option value="g">g</option>
                           <option value="ml">ml</option>
@@ -1547,23 +1792,44 @@ export default function AdminDashboard() {
               </div>
               
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mt-8">
-                <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+                <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                   <div>
                     <h3 className="text-xl font-black text-gray-800">Inventory Logs</h3>
                     <p className="text-xs text-gray-500 font-medium mt-1">History of added stock.</p>
                   </div>
-                  <button
-                    onClick={exportInventoryCSV}
-                    disabled={inventoryLogs.length === 0}
-                    className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Download className="w-4 h-4" /> Export CSV
-                  </button>
+                  <div className="flex gap-3">
+                    <select
+                      value={inventoryLogPeriod}
+                      onChange={(e) => setInventoryLogPeriod(e.target.value as any)}
+                      className="bg-white border-2 border-gray-100 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="specific">Specific Date</option>
+                    </select>
+                    {inventoryLogPeriod === 'specific' && (
+                      <input
+                        type="date"
+                        value={inventorySpecificDate}
+                        onChange={(e) => setInventorySpecificDate(e.target.value)}
+                        className="bg-white border-2 border-gray-100 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
+                      />
+                    )}
+                    <button
+                      onClick={exportInventoryCSV}
+                      disabled={filteredInventoryLogs.length === 0}
+                      className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Download className="w-4 h-4" /> Export CSV
+                    </button>
+                  </div>
                 </div>
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto max-h-[400px]">
                   <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black">
+                    <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black z-10 shadow-sm">
+                      <tr>
                         <th className="p-6">Date</th>
                         <th className="p-6">Time</th>
                         <th className="p-6">Stock Added</th>
@@ -1571,7 +1837,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {[...inventoryLogs].sort((a, b) => b.id - a.id).map(log => {
+                      {[...filteredInventoryLogs].sort((a, b) => b.id - a.id).map(log => {
                         return (
                           <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
                             <td className="p-6 font-bold text-gray-800">{log.date.split('T')[0]}</td>
@@ -1581,9 +1847,9 @@ export default function AdminDashboard() {
                           </tr>
                         );
                       })}
-                      {inventoryLogs.length === 0 && (
+                      {filteredInventoryLogs.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="p-6 text-center text-gray-400 font-medium">No inventory logs found.</td>
+                          <td colSpan={4} className="p-6 text-center text-gray-400 font-medium">No inventory logs found for the selected period.</td>
                         </tr>
                       )}
                     </tbody>
@@ -1935,9 +2201,13 @@ export default function AdminDashboard() {
                   <div className="space-y-1 mb-4 relative">
                     <div className="flex justify-between"><span>Subtotal:</span> <span>{viewingReceipt.subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
                     {viewingReceipt.discountType !== 'REGULAR' && (
-                      <div className="flex justify-between italic text-red-600">
-                        <span>{viewingReceipt.discountType} Disc ({(viewingReceipt.discountRate * 100).toFixed(0)}%):</span>
-                        <span>-{viewingReceipt.discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div className="flex flex-col text-red-600 italic">
+                        <div className="flex justify-between">
+                          <span>{viewingReceipt.discountType} Disc ({(viewingReceipt.discountRate * 100).toFixed(0)}%):</span>
+                          <span>-{viewingReceipt.discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        {viewingReceipt.customerName && <div className="text-[9px] mt-0.5 text-gray-500 not-italic font-bold">Name: {viewingReceipt.customerName}</div>}
+                        {viewingReceipt.customerIdNumber && <div className="text-[9px] text-gray-500 not-italic font-bold">ID No: {viewingReceipt.customerIdNumber}</div>}
                       </div>
                     )}
                     <div className="flex justify-between"><span>VATable Amt:</span> <span>{(viewingReceipt.total - viewingReceipt.vatAmount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
@@ -1946,8 +2216,16 @@ export default function AdminDashboard() {
                       <span>TOTAL:</span>
                       <span>{viewingReceipt.total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
-                    <div className="flex justify-between pt-2 text-gray-500"><span>Cash:</span> <span>{viewingReceipt.cashTendered.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between text-gray-500"><span>Change:</span> <span>{viewingReceipt.change.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                    <div className="flex justify-between pt-2 text-gray-500">
+                      <span>{viewingReceipt.paymentMethod === 'OR' ? 'OR Payment:' : 'Cash:'}</span> 
+                      <span>{viewingReceipt.cashTendered.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                    {viewingReceipt.paymentMethod === 'OR' && viewingReceipt.orNumber && (
+                      <div className="flex justify-between text-gray-500"><span>OR Number:</span> <span>{viewingReceipt.orNumber}</span></div>
+                    )}
+                    {(!viewingReceipt.paymentMethod || viewingReceipt.paymentMethod === 'Cash') && (
+                      <div className="flex justify-between text-gray-500"><span>Change:</span> <span>{viewingReceipt.change.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
+                    )}
                   </div>
 
                   <div className="text-center space-y-1 mt-6 border-t border-dashed border-gray-400 pt-4 relative">
@@ -2224,6 +2502,77 @@ export default function AdminDashboard() {
                     Update Record
                   </button>
                 </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* CASH COUNT DETAILS MODAL */}
+      <AnimatePresence>
+        {selectedCashCount && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden my-auto border border-gray-100"
+            >
+              <div className="bg-hcdc-blue p-6 text-white flex justify-between items-start sticky top-0">
+                <div>
+                  <h3 className="text-xl font-black tracking-tight">Cash Breakdown</h3>
+                  <p className="text-xs text-white/60 mt-1 uppercase tracking-widest font-bold">
+                    {selectedCashCount.cashier} • {selectedCashCount.date.split('T')[0]}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedCashCount(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-6">
+                {selectedCashCount.denominations ? (
+                  <div className="space-y-3">
+                    {['1000', '500', '200', '100', '50', '20', '10', '5', '1', 'coins'].map(den => {
+                      // @ts-ignore
+                      const qty = selectedCashCount.denominations[den] || 0;
+                      if (qty === 0) return null;
+                      const val = den === 'coins' ? 1 : parseInt(den);
+                      const amount = qty * val;
+                      return (
+                        <div key={den} className="flex justify-between items-center text-sm">
+                          <span className="font-bold text-gray-500 uppercase tracking-wider text-[11px] w-16 text-right">
+                            {den === 'coins' ? 'Coins' : `₱${den}`}
+                          </span>
+                          <span className="font-bold text-gray-400">x {qty}</span>
+                          <span className="font-black text-gray-800 w-24 text-right">
+                            ₱{amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                    <div className="pt-4 mt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
+                      <span className="font-black uppercase tracking-widest text-gray-400 text-xs">Total Cash</span>
+                      <span className="font-black text-hcdc-blue text-xl">
+                        ₱{selectedCashCount.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    {selectedCashCount.totalORAmount !== undefined && (
+                      <div className="pt-2 mt-2 flex justify-between items-center">
+                        <span className="font-black uppercase tracking-widest text-gray-400 text-xs">Total OR Amount</span>
+                        <span className="font-black text-hcdc-red text-xl">
+                          ₱{selectedCashCount.totalORAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-10 text-gray-400 font-bold">
+                    No detailed breakdown available for this record.
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

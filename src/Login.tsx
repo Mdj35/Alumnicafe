@@ -24,7 +24,7 @@ export default function Login() {
     const cashiers = await getCashiers();
     const cashier = cashiers.find(c => c.username === username);
 
-    if (cashier && (cashier.password === password || (!cashier.password && password === '12345'))) {
+    if (cashier && cashier.isActive !== false && (cashier.password === password || (!cashier.password && password === '12345'))) {
       localStorage.setItem('cashier_auth', 'true');
       localStorage.setItem('cashier_name', cashier.name);
       localStorage.setItem('cashier_id', cashier.id.toString());
@@ -32,7 +32,7 @@ export default function Login() {
       await recordCashierLogin(cashier.id);
       navigate('/');
     } else {
-      setError('Invalid username or password');
+      setError('Invalid username or password, or account is deactivated');
     }
   };
 
@@ -43,7 +43,7 @@ export default function Login() {
     const cashiers = await getCashiers();
     const cashier = cashiers.find(c => c.username === adminUsername);
 
-    if (cashier && cashier.role === 'Admin' && cashier.password === adminPassword) {
+    if (cashier && cashier.isActive !== false && cashier.role === 'Admin' && cashier.password === adminPassword) {
       localStorage.setItem('cashier_auth', 'true');
       localStorage.setItem('cashier_name', cashier.name);
       localStorage.setItem('cashier_id', cashier.id.toString());
@@ -51,7 +51,7 @@ export default function Login() {
       await recordCashierLogin(cashier.id);
       navigate('/admin');
     } else {
-      setAdminError('Invalid admin credentials');
+      setAdminError('Invalid admin credentials, or account is deactivated');
     }
   };
 

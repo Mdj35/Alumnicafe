@@ -8,6 +8,7 @@ export interface CashierAccount {
   role: string;
   password?: string;
   lastLogin?: string;
+  isActive?: boolean;
 }
 
 const COLLECTION_NAME = 'cashiers';
@@ -42,7 +43,7 @@ export async function getCashiers(): Promise<CashierAccount[]> {
 export async function addCashier(item: Omit<CashierAccount, 'id'>): Promise<CashierAccount[]> {
   const currentCashiers = await getCashiers();
   const newId = currentCashiers.length > 0 ? Math.max(...currentCashiers.map(i => i.id)) + 1 : 1;
-  const newItem = { ...item, id: newId, password: item.password ?? '12345' };
+  const newItem = { ...item, id: newId, password: item.password ?? '12345', isActive: true };
   
   await setDoc(doc(db, COLLECTION_NAME, newId.toString()), newItem);
   return await getCashiers();
@@ -56,7 +57,13 @@ export async function updateCashier(id: number, updates: Partial<CashierAccount>
 
 export async function deleteCashier(id: number): Promise<CashierAccount[]> {
   const docRef = doc(db, COLLECTION_NAME, id.toString());
-  await deleteDoc(docRef);
+  await updateDoc(docRef, { isActive: false });
+  return await getCashiers();
+}
+
+export async function toggleCashierStatus(id: number, isActive: boolean): Promise<CashierAccount[]> {
+  const docRef = doc(db, COLLECTION_NAME, id.toString());
+  await updateDoc(docRef, { isActive });
   return await getCashiers();
 }
 
