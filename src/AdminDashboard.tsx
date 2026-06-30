@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Users,
   TrendingUp,
@@ -42,11 +42,21 @@ import {
 } from 'recharts';
 import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, MenuItem, getMenuCategories, addMenuCategory, deleteMenuCategory } from './menuStorage';
 import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
-import { getCashiers, addCashier, updateCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
+import { getCashiers, addCashier, updateCashier, deleteCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
 import { getInventory, saveInventory, deleteInventoryItem, Inventory, getInventoryLogs, addInventoryLog, InventoryLog } from './inventoryStorage';
-import { getCashCounts, CashCountRecord } from './cashCountStorage';
+
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const isAuth = localStorage.getItem('cashier_auth') === 'true';
+    const role = localStorage.getItem('cashier_role');
+    if (!isAuth || role !== 'Admin') {
+      navigate('/login');
+    }
+  }, [navigate]);
+
   const [activeTab, setActiveTab] = useState<'analytics' | 'cashiers' | 'reports' | 'menu' | 'inventory'>('analytics');
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'specific' | 'range'>('weekly');
   const [analyticsSpecificDate, setAnalyticsSpecificDate] = useState('');
@@ -73,8 +83,6 @@ export default function AdminDashboard() {
   const [showCashierModal, setShowCashierModal] = useState(false);
   const [editingCashier, setEditingCashier] = useState<CashierAccount | null>(null);
   const [cashierForm, setCashierForm] = useState({ name: '', usernamePrefix: '', role: 'Cashier' });
-  const [cashCounts, setCashCounts] = useState<CashCountRecord[]>([]);
-  const [selectedCashCount, setSelectedCashCount] = useState<CashCountRecord | null>(null);
 
   // Confirmation Modals State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -94,6 +102,8 @@ export default function AdminDashboard() {
   const [inventorySpecificDate, setInventorySpecificDate] = useState('');
   const [addInventoryForm, setAddInventoryForm] = useState({ name: '', quantity: '', unit: 'g' });
   const [isAddingNewStock, setIsAddingNewStock] = useState(false);
+  const [showAddInventoryModal, setShowAddInventoryModal] = useState(false);
+  const [addInventoryLocation, setAddInventoryLocation] = useState<'master' | 'cafe'>('master');
 
   // Inventory edit/delete (password-protected)
   const [showInvAuthModal, setShowInvAuthModal] = useState(false);
@@ -118,14 +128,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      const [m, t, c, cat, i, l, cc] = await Promise.all([
+      const [m, t, c, cat, i, l] = await Promise.all([
         getMenuItems(),
         getTransactions(),
         getCashiers(),
         getMenuCategories(),
         getInventory(),
-        getInventoryLogs(),
-        getCashCounts()
+        getInventoryLogs()
       ]);
       if (isMounted) {
         setMenuItems(m);
@@ -134,7 +143,6 @@ export default function AdminDashboard() {
         setCategories(cat);
         setInventory(i);
         setInventoryLogs(l);
-        setCashCounts(cc);
       }
     };
     loadData();
@@ -210,27 +218,33 @@ export default function AdminDashboard() {
     
     if (qty > 0 && name) {
       const now = new Date();
+      const locationLabel = addInventoryLocation === 'master' ? 'Master' : 'Cafe';
       const newLogs = await addInventoryLog({
         date: now.toISOString(),
         time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
-        stockName: name,
+        stockName: `${name} (${locationLabel})`,
         addedQuantity: qty,
         unit: addInventoryForm.unit
       });
       setInventoryLogs(newLogs);
 
-      const existingItem = inventory.find(i => i.name.toLowerCase() === name.toLowerCase() && i.unit === addInventoryForm.unit);
+      const existingItem = inventory.find(i => 
+        i.name.toLowerCase() === name.toLowerCase() && 
+        i.unit === addInventoryForm.unit && 
+        (i.location || 'cafe') === addInventoryLocation
+      );
       let updated: Inventory;
       if (existingItem) {
         updated = inventory.map(i => i.id === existingItem.id ? { ...i, quantity: i.quantity + qty } : i);
       } else {
         const newId = `inv_${Date.now()}`;
-        updated = [...inventory, { id: newId, name, quantity: qty, unit: addInventoryForm.unit as 'g'|'ml'|'pcs' }];
+        updated = [...inventory, { id: newId, name, quantity: qty, unit: addInventoryForm.unit as 'g'|'ml'|'pcs', location: addInventoryLocation }];
       }
       await saveInventory(updated);
       setInventory(updated);
       setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
       setIsAddingNewStock(false);
+      setShowAddInventoryModal(false);
     }
   };
 
@@ -1302,57 +1316,7 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mt-8">
-              <div className="p-8 border-b border-gray-50 flex justify-between items-center">
-                <div>
-                  <h3 className="text-xl font-black text-gray-800">Cash Count History</h3>
-                  <p className="text-xs text-gray-500 font-medium mt-1">End of shift cash drawer counts reported by cashiers.</p>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto max-h-[400px]">
-                <table className="w-full text-left">
-                  <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10">
-                    <tr className="border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black">
-                      <th className="p-6">Date</th>
-                      <th className="p-6">Time</th>
-                      <th className="p-6">Cashier</th>
-                      <th className="p-6 text-right">Cash Amount (₱)</th>
-                      <th className="p-6 text-right">OR Amount (₱)</th>
-                      <th className="p-6 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {cashCounts.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="p-6 text-center text-gray-400 font-medium">No cash counts recorded.</td>
-                      </tr>
-                    ) : (
-                      cashCounts.map((cc) => (
-                        <tr key={cc.id} className="hover:bg-gray-50/50 transition-colors">
-                          <td className="p-6 text-sm font-bold text-gray-800">{cc.date.split('T')[0]}</td>
-                          <td className="p-6 text-sm font-mono text-gray-500">{cc.time}</td>
-                          <td className="p-6 text-sm font-bold text-gray-700">{cc.cashier}</td>
-                          <td className="p-6 text-right font-black text-hcdc-blue">
-                            {cc.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-6 text-right font-black text-hcdc-red">
-                            {(cc.totalORAmount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="p-6 text-center">
-                            <button
-                              onClick={() => setSelectedCashCount(cc)}
-                              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition-all"
-                            >
-                              View Details
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+
             </div>
           )}
 
@@ -1624,14 +1588,51 @@ export default function AdminDashboard() {
           {/* --- INVENTORY TAB --- */}
           {activeTab === 'inventory' && (
             <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm gap-4">
+                <div>
+                  <h3 className="text-xl font-black text-gray-800">Inventory Stock</h3>
+                  <p className="text-xs text-gray-500 font-medium mt-1">Manage Master and Cafe inventories.</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setAddInventoryLocation('master');
+                      setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
+                      setIsAddingNewStock(false);
+                      setShowAddInventoryModal(true);
+                    }}
+                    className="px-5 py-3 bg-hcdc-blue hover:bg-hcdc-blue-dark text-white font-black rounded-xl transition-all shadow-md flex items-center gap-2 text-xs uppercase tracking-wider"
+                  >
+                    <Plus className="w-4 h-4" /> Add Master Stock
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAddInventoryLocation('cafe');
+                      setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
+                      setIsAddingNewStock(false);
+                      setShowAddInventoryModal(true);
+                    }}
+                    className="px-5 py-3 bg-hcdc-gold hover:bg-[#D4A017] text-white font-black rounded-xl transition-all shadow-md flex items-center gap-2 text-xs uppercase tracking-wider"
+                  >
+                    <Plus className="w-4 h-4" /> Add Cafe Stock
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Master Inventory */}
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <h3 className="text-xl font-black text-gray-800 mb-6">Current Stock</h3>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-black text-gray-800">Master Inventory</h3>
+                    <span className="px-2.5 py-1 bg-hcdc-light-blue text-hcdc-blue rounded-lg text-xs font-bold uppercase tracking-wider">
+                      Central Warehouse
+                    </span>
+                  </div>
                   <div className="space-y-3">
-                    {inventory.length === 0 ? (
-                      <p className="text-sm text-gray-500 text-center py-4">No stock items available.</p>
+                    {inventory.filter(item => item.location === 'master').length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-8">No master stock items available.</p>
                     ) : (
-                      inventory.map(stock => (
+                      inventory.filter(item => item.location === 'master').map(stock => (
                         <div key={stock.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl group hover:bg-white hover:shadow-md border-2 border-transparent hover:border-gray-100 transition-all">
                           <div className="flex-1 min-w-0">
                             <p className="font-bold text-gray-700 truncate">{stock.name}</p>
@@ -1662,74 +1663,46 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
+                {/* Cafe Inventory */}
                 <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <h3 className="text-xl font-black text-gray-800 mb-6">Add Stock</h3>
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Name of Stock</label>
-                      <select
-                        value={isAddingNewStock ? 'NEW_STOCK' : addInventoryForm.name}
-                        onChange={(e) => {
-                          if (e.target.value === 'NEW_STOCK') {
-                            setIsAddingNewStock(true);
-                            setAddInventoryForm({ ...addInventoryForm, name: '', unit: 'g' });
-                          } else {
-                            setIsAddingNewStock(false);
-                            const selectedStock = inventory.find(i => i.name === e.target.value);
-                            setAddInventoryForm({ ...addInventoryForm, name: e.target.value, unit: selectedStock?.unit || 'g' });
-                          }
-                        }}
-                        className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mb-3 appearance-none"
-                      >
-                        <option value="" disabled>Select an existing stock</option>
-                        {inventory.map(stock => (
-                          <option key={stock.id} value={stock.name}>{stock.name}</option>
-                        ))}
-                        <option value="NEW_STOCK" className="font-bold text-hcdc-blue">+ Add New Stock...</option>
-                      </select>
-                      
-                      {isAddingNewStock && (
-                        <input
-                          type="text"
-                          value={addInventoryForm.name}
-                          onChange={(e) => setAddInventoryForm({ ...addInventoryForm, name: e.target.value })}
-                          className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mt-2"
-                          placeholder="Type new stock name..."
-                          autoFocus
-                        />
-                      )}
-                    </div>
-                    <div className="flex gap-4">
-                      <div className="flex-1">
-                        <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Measurements</label>
-                        <input
-                          type="number"
-                          value={addInventoryForm.quantity}
-                          onChange={(e) => setAddInventoryForm({ ...addInventoryForm, quantity: e.target.value })}
-                          className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all"
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="w-24">
-                        <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Unit</label>
-                        <select
-                          value={addInventoryForm.unit}
-                          disabled={!isAddingNewStock && !!addInventoryForm.name}
-                          onChange={(e) => setAddInventoryForm({ ...addInventoryForm, unit: e.target.value })}
-                          className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all disabled:opacity-50 appearance-none"
-                        >
-                          <option value="g">g</option>
-                          <option value="ml">ml</option>
-                          <option value="pcs">pcs</option>
-                        </select>
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleAddInventory}
-                      className="w-full h-12 bg-hcdc-blue hover:bg-hcdc-blue-dark text-white font-black rounded-xl transition-all shadow-md mt-2"
-                    >
-                      Update Inventory
-                    </button>
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-xl font-black text-gray-800">Cafe Inventory</h3>
+                    <span className="px-2.5 py-1 bg-amber-50 text-hcdc-gold rounded-lg text-xs font-bold uppercase tracking-wider">
+                      Cafe Outlet
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {inventory.filter(item => !item.location || item.location === 'cafe').length === 0 ? (
+                      <p className="text-sm text-gray-500 text-center py-8">No cafe stock items available.</p>
+                    ) : (
+                      inventory.filter(item => !item.location || item.location === 'cafe').map(stock => (
+                        <div key={stock.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl group hover:bg-white hover:shadow-md border-2 border-transparent hover:border-gray-100 transition-all">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-700 truncate">{stock.name}</p>
+                            <p className="text-xs text-gray-400 font-medium">{stock.unit === 'g' ? 'Grams' : stock.unit === 'ml' ? 'Millilitres' : 'Pieces'}</p>
+                          </div>
+                          <span className="text-xl font-black text-hcdc-blue tabular-nums shrink-0">
+                            {stock.quantity.toLocaleString()} {stock.unit}
+                          </span>
+                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                            <button
+                              onClick={() => initiateInvAuth('edit', stock.id)}
+                              title="Edit ingredient"
+                              className="w-8 h-8 rounded-xl bg-hcdc-light-blue text-hcdc-blue flex items-center justify-center hover:bg-hcdc-blue hover:text-white transition-all"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => initiateInvAuth('delete', stock.id)}
+                              title="Delete ingredient"
+                              className="w-8 h-8 rounded-xl bg-red-50 text-hcdc-red flex items-center justify-center hover:bg-hcdc-red hover:text-white transition-all"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
@@ -1997,6 +1970,115 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
 
+      {/* ADD INVENTORY MODAL */}
+      <AnimatePresence>
+        {showAddInventoryModal && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 backdrop-blur-md p-4">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-sm shadow-2xl overflow-hidden border border-gray-100"
+            >
+              <div className={`p-8 text-white flex justify-between items-center ${addInventoryLocation === 'master' ? 'bg-hcdc-blue' : 'bg-hcdc-gold'}`}>
+                <div>
+                  <h3 className="text-sm font-black uppercase tracking-widest opacity-60 mb-1">Add Stock</h3>
+                  <p className="text-2xl font-black tracking-tight font-heading">
+                    {addInventoryLocation === 'master' ? 'Master Inventory' : 'Cafe Inventory'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setShowAddInventoryModal(false); setIsAddingNewStock(false); }}
+                  className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-8 space-y-5">
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Name of Stock</label>
+                  <select
+                    value={isAddingNewStock ? 'NEW_STOCK' : addInventoryForm.name}
+                    onChange={(e) => {
+                      if (e.target.value === 'NEW_STOCK') {
+                        setIsAddingNewStock(true);
+                        setAddInventoryForm({ ...addInventoryForm, name: '', unit: 'g' });
+                      } else {
+                        setIsAddingNewStock(false);
+                        const selectedStock = inventory.find(i => i.name === e.target.value && (i.location || 'cafe') === addInventoryLocation);
+                        setAddInventoryForm({ ...addInventoryForm, name: e.target.value, unit: selectedStock?.unit || 'g' });
+                      }
+                    }}
+                    className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mb-3 appearance-none focus:outline-none"
+                  >
+                    <option value="" disabled>Select an existing stock</option>
+                    {inventory
+                      .filter(stock => (stock.location || 'cafe') === addInventoryLocation)
+                      .map(stock => (
+                        <option key={stock.id} value={stock.name}>{stock.name}</option>
+                      ))}
+                    <option value="NEW_STOCK" className="font-bold text-hcdc-blue">+ Add New Stock...</option>
+                  </select>
+                  
+                  {isAddingNewStock && (
+                    <input
+                      type="text"
+                      value={addInventoryForm.name}
+                      onChange={(e) => setAddInventoryForm({ ...addInventoryForm, name: e.target.value })}
+                      className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mt-2 focus:outline-none"
+                      placeholder="Type new stock name..."
+                      autoFocus
+                    />
+                  )}
+                </div>
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Measurements</label>
+                    <input
+                      type="number"
+                      value={addInventoryForm.quantity}
+                      onChange={(e) => setAddInventoryForm({ ...addInventoryForm, quantity: e.target.value })}
+                      className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all focus:outline-none"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="w-24">
+                    <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Unit</label>
+                    <select
+                      value={addInventoryForm.unit}
+                      disabled={!isAddingNewStock && !!addInventoryForm.name}
+                      onChange={(e) => setAddInventoryForm({ ...addInventoryForm, unit: e.target.value })}
+                      className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all disabled:opacity-50 appearance-none focus:outline-none"
+                    >
+                      <option value="g">g</option>
+                      <option value="ml">ml</option>
+                      <option value="pcs">pcs</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => { setShowAddInventoryModal(false); setIsAddingNewStock(false); }}
+                    className="flex-1 h-12 bg-gray-50 text-gray-400 font-bold rounded-xl hover:bg-gray-100 transition-all uppercase tracking-widest text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddInventory}
+                    disabled={!addInventoryForm.name.trim() || !addInventoryForm.quantity}
+                    className={`flex-[2] h-12 text-white font-black rounded-xl shadow-lg transition-all disabled:opacity-30 text-sm uppercase tracking-wider ${
+                      addInventoryLocation === 'master' ? 'bg-hcdc-blue hover:bg-hcdc-blue-dark shadow-hcdc-blue/20' : 'bg-hcdc-gold hover:bg-[#D4A017] shadow-hcdc-gold/20'
+                    }`}
+                  >
+                    Update Inventory
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* ADD / EDIT MODAL */}
       <AnimatePresence>
         {(showAddModal || editingItem) && (
@@ -2058,7 +2140,10 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-center">
                     <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block">Required Ingredients</label>
                     <button
-                      onClick={() => setFormData({ ...formData, ingredients: [...formData.ingredients, { inventoryId: inventory[0]?.id || '', quantity: 0 }] })}
+                      onClick={() => {
+                        const cafeInv = inventory.filter(stock => !stock.location || stock.location === 'cafe');
+                        setFormData({ ...formData, ingredients: [...formData.ingredients, { inventoryId: cafeInv[0]?.id || '', quantity: 0 }] });
+                      }}
                       className="text-xs font-bold text-hcdc-blue hover:underline flex items-center gap-1"
                     >
                       <Plus className="w-3 h-3" /> Add Ingredient
@@ -2076,7 +2161,7 @@ export default function AdminDashboard() {
                         className="flex-1 bg-white h-10 px-3 rounded-xl border border-gray-100 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-hcdc-blue/20"
                       >
                         <option value="" disabled>Select Stock</option>
-                        {inventory.map(stock => (
+                        {inventory.filter(stock => !stock.location || stock.location === 'cafe').map(stock => (
                           <option key={stock.id} value={stock.id}>{stock.name} ({stock.unit})</option>
                         ))}
                       </select>
@@ -2508,76 +2593,6 @@ export default function AdminDashboard() {
         )}
       </AnimatePresence>
 
-      {/* CASH COUNT DETAILS MODAL */}
-      <AnimatePresence>
-        {selectedCashCount && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden my-auto border border-gray-100"
-            >
-              <div className="bg-hcdc-blue p-6 text-white flex justify-between items-start sticky top-0">
-                <div>
-                  <h3 className="text-xl font-black tracking-tight">Cash Breakdown</h3>
-                  <p className="text-xs text-white/60 mt-1 uppercase tracking-widest font-bold">
-                    {selectedCashCount.cashier} • {selectedCashCount.date.split('T')[0]}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setSelectedCashCount(null)}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="p-6">
-                {selectedCashCount.denominations ? (
-                  <div className="space-y-3">
-                    {['1000', '500', '200', '100', '50', '20', '10', '5', '1', 'coins'].map(den => {
-                      // @ts-ignore
-                      const qty = selectedCashCount.denominations[den] || 0;
-                      if (qty === 0) return null;
-                      const val = den === 'coins' ? 1 : parseInt(den);
-                      const amount = qty * val;
-                      return (
-                        <div key={den} className="flex justify-between items-center text-sm">
-                          <span className="font-bold text-gray-500 uppercase tracking-wider text-[11px] w-16 text-right">
-                            {den === 'coins' ? 'Coins' : `₱${den}`}
-                          </span>
-                          <span className="font-bold text-gray-400">x {qty}</span>
-                          <span className="font-black text-gray-800 w-24 text-right">
-                            ₱{amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    <div className="pt-4 mt-4 border-t border-dashed border-gray-200 flex justify-between items-center">
-                      <span className="font-black uppercase tracking-widest text-gray-400 text-xs">Total Cash</span>
-                      <span className="font-black text-hcdc-blue text-xl">
-                        ₱{selectedCashCount.amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    </div>
-                    {selectedCashCount.totalORAmount !== undefined && (
-                      <div className="pt-2 mt-2 flex justify-between items-center">
-                        <span className="font-black uppercase tracking-widest text-gray-400 text-xs">Total OR Amount</span>
-                        <span className="font-black text-hcdc-red text-xl">
-                          ₱{selectedCashCount.totalORAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-10 text-gray-400 font-bold">
-                    No detailed breakdown available for this record.
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
 
       {/* Global Confirmation Modal */}
       <AnimatePresence>

@@ -70,7 +70,15 @@ export default function App() {
   const cashierName = localStorage.getItem('cashier_name') || 'Staff 01';
 
   const handleLogout = () => {
-    setShowCashCountModal(true);
+    if (localStorage.getItem('cashier_role') === 'Admin') {
+      localStorage.removeItem('cashier_auth');
+      localStorage.removeItem('cashier_name');
+      localStorage.removeItem('cashier_id');
+      localStorage.removeItem('cashier_role');
+      navigate('/login');
+    } else {
+      setShowCashCountModal(true);
+    }
   };
 
   const confirmLogout = async () => {
@@ -86,6 +94,8 @@ export default function App() {
     });
     localStorage.removeItem('cashier_auth');
     localStorage.removeItem('cashier_name');
+    localStorage.removeItem('cashier_id');
+    localStorage.removeItem('cashier_role');
     navigate('/login');
   };
 
@@ -128,7 +138,7 @@ export default function App() {
   const totalCashCount = useMemo(() => {
     return Object.entries(cashDenominations).reduce((sum, [den, qty]) => {
       const val = den === 'coins' ? 1 : parseInt(den);
-      return sum + (val * qty);
+      return sum + (val * (qty as number));
     }, 0);
   }, [cashDenominations]);
 

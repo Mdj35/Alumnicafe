@@ -9,13 +9,14 @@ export interface InventoryItem {
   name: string;
   quantity: number;
   unit: 'g' | 'ml' | 'pcs';
+  location?: 'master' | 'cafe';
 }
 
 export type Inventory = InventoryItem[];
 
 const DEFAULT_INVENTORY: Inventory = [
-  { id: 'inv_1', name: 'Coffee Beans', quantity: 0, unit: 'g' },
-  { id: 'inv_2', name: 'Milk', quantity: 0, unit: 'ml' }
+  { id: 'inv_1', name: 'Coffee Beans', quantity: 0, unit: 'g', location: 'cafe' },
+  { id: 'inv_2', name: 'Milk', quantity: 0, unit: 'ml', location: 'cafe' }
 ];
 
 export async function getInventory(): Promise<Inventory> {
@@ -29,7 +30,11 @@ export async function getInventory(): Promise<Inventory> {
     }
     const inventory: Inventory = [];
     querySnapshot.forEach((docSnap) => {
-      inventory.push(docSnap.data() as InventoryItem);
+      const data = docSnap.data() as InventoryItem;
+      if (!data.location) {
+        data.location = 'cafe';
+      }
+      inventory.push(data);
     });
     return inventory.sort((a, b) => a.id.localeCompare(b.id));
   } catch (error) {
