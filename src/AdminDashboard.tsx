@@ -219,6 +219,26 @@ export default function AdminDashboard() {
     if (qty > 0 && name) {
       const now = new Date();
       const locationLabel = addInventoryLocation === 'master' ? 'Master' : 'Cafe';
+      
+      // If adding to cafe stock, we must validate against Master Inventory
+      if (addInventoryLocation === 'cafe') {
+        const masterItem = inventory.find(i => 
+          i.name.toLowerCase() === name.toLowerCase() && 
+          i.unit === addInventoryForm.unit && 
+          i.location === 'master'
+        );
+        
+        if (!masterItem) {
+          alert(`This item does not exist in Master Inventory. Please add it to Master Inventory first.`);
+          return;
+        }
+        
+        if (qty > masterItem.quantity) {
+          alert(`Insufficient stock in Master Inventory! Only ${masterItem.quantity} ${masterItem.unit} of ${masterItem.name} is available.`);
+          return;
+        }
+      }
+
       const newLogs = await addInventoryLog({
         date: now.toISOString(),
         time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
@@ -228,18 +248,46 @@ export default function AdminDashboard() {
       });
       setInventoryLogs(newLogs);
 
-      const existingItem = inventory.find(i => 
-        i.name.toLowerCase() === name.toLowerCase() && 
-        i.unit === addInventoryForm.unit && 
-        (i.location || 'cafe') === addInventoryLocation
-      );
-      let updated: Inventory;
-      if (existingItem) {
-        updated = inventory.map(i => i.id === existingItem.id ? { ...i, quantity: i.quantity + qty } : i);
+      let updated: Inventory = [...inventory];
+      
+      if (addInventoryLocation === 'cafe') {
+        // 1. Deduct from Master Inventory
+        const masterItem = inventory.find(i => 
+          i.name.toLowerCase() === name.toLowerCase() && 
+          i.unit === addInventoryForm.unit && 
+          i.location === 'master'
+        )!;
+        updated = updated.map(i => i.id === masterItem.id ? { ...i, quantity: Math.max(0, i.quantity - qty) } : i);
+        
+        // 2. Add to Cafe Inventory
+        const existingCafeItem = inventory.find(i => 
+          i.name.toLowerCase() === name.toLowerCase() && 
+          i.unit === addInventoryForm.unit && 
+          (i.location || 'cafe') === 'cafe'
+        );
+        
+        if (existingCafeItem) {
+          updated = updated.map(i => i.id === existingCafeItem.id ? { ...i, quantity: i.quantity + qty } : i);
+        } else {
+          const newId = `inv_${Date.now()}`;
+          updated = [...updated, { id: newId, name, quantity: qty, unit: addInventoryForm.unit as 'g'|'ml'|'pcs', location: 'cafe' }];
+        }
       } else {
-        const newId = `inv_${Date.now()}`;
-        updated = [...inventory, { id: newId, name, quantity: qty, unit: addInventoryForm.unit as 'g'|'ml'|'pcs', location: addInventoryLocation }];
+        // Adding/stocking Master Inventory
+        const existingMasterItem = inventory.find(i => 
+          i.name.toLowerCase() === name.toLowerCase() && 
+          i.unit === addInventoryForm.unit && 
+          i.location === 'master'
+        );
+        
+        if (existingMasterItem) {
+          updated = updated.map(i => i.id === existingMasterItem.id ? { ...i, quantity: i.quantity + qty } : i);
+        } else {
+          const newId = `inv_${Date.now()}`;
+          updated = [...updated, { id: newId, name, quantity: qty, unit: addInventoryForm.unit as 'g'|'ml'|'pcs', location: 'master' }];
+        }
       }
+      
       await saveInventory(updated);
       setInventory(updated);
       setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
@@ -265,7 +313,7 @@ export default function AdminDashboard() {
       price: parseFloat(formData.price),
       category: formData.category,
       icon: formData.icon,
-      image: formData.image || undefined,
+      image: formData.image,
       ingredients: formData.ingredients
     });
     setMenuItems(updated);
@@ -280,7 +328,7 @@ export default function AdminDashboard() {
       price: parseFloat(formData.price),
       category: formData.category,
       icon: formData.icon,
-      image: formData.image || undefined,
+      image: formData.image,
       ingredients: formData.ingredients
     });
     setMenuItems(updated);
@@ -2005,20 +2053,39 @@ export default function AdminDashboard() {
                         setAddInventoryForm({ ...addInventoryForm, name: '', unit: 'g' });
                       } else {
                         setIsAddingNewStock(false);
-                        const selectedStock = inventory.find(i => i.name === e.target.value && (i.location || 'cafe') === addInventoryLocation);
+                        const selectedStock = inventory.find(i => i.name === e.target.value && i.location === 'master');
                         setAddInventoryForm({ ...addInventoryForm, name: e.target.value, unit: selectedStock?.unit || 'g' });
                       }
                     }}
-                    className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mb-3 appearance-none focus:outline-none"
+                    className="w-full h-12 px-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold transition-all mb-1 appearance-none focus:outline-none text-sm text-gray-750"
                   >
-                    <option value="" disabled>Select an existing stock</option>
-                    {inventory
-                      .filter(stock => (stock.location || 'cafe') === addInventoryLocation)
-                      .map(stock => (
-                        <option key={stock.id} value={stock.name}>{stock.name}</option>
-                      ))}
-                    <option value="NEW_STOCK" className="font-bold text-hcdc-blue">+ Add New Stock...</option>
+                    <option value="" disabled>Select a stock item</option>
+                    {addInventoryLocation === 'cafe' ? (
+                      inventory
+                        .filter(stock => stock.location === 'master' && stock.quantity > 0)
+                        .map(stock => (
+                          <option key={stock.id} value={stock.name}>
+                            {stock.name} ({stock.quantity.toLocaleString()} {stock.unit} available in Master)
+                          </option>
+                        ))
+                    ) : (
+                      inventory
+                        .filter(stock => stock.location === 'master')
+                        .map(stock => (
+                          <option key={stock.id} value={stock.name}>
+                            {stock.name} ({stock.quantity.toLocaleString()} {stock.unit} current)
+                          </option>
+                        ))
+                    )}
+                    {addInventoryLocation === 'master' && (
+                      <option value="NEW_STOCK" className="font-bold text-hcdc-blue">+ Add New Stock...</option>
+                    )}
                   </select>
+                  {addInventoryLocation === 'cafe' && (
+                    <p className="text-[9px] text-amber-600 font-bold mb-3 mt-1 leading-normal">
+                      ⚠️ Items must exist and have available quantity in Master Stock to transfer.
+                    </p>
+                  )}
                   
                   {isAddingNewStock && (
                     <input
@@ -2251,72 +2318,49 @@ export default function AdminDashboard() {
                     <UtensilsCrossed className="w-48 h-48" />
                   </div>
 
-                  <div className="text-center space-y-0.5 mb-6 relative">
-                    <p className="text-base font-black uppercase tracking-tight">AlumniCafe</p>
-                    <p>Holy Cross of Davao College</p>
-                    <p>Sta. Ana Ave., Davao City</p>
-                    <p>VAT Reg TIN: 000-000-0000</p>
-                    <p>Tel: (082) 000-0000</p>
+                  <div className="text-center space-y-1 mb-6 relative">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
+                    <p className="text-4xl font-black text-hcdc-blue tracking-tight">{viewingReceipt.id.split('-').pop()}</p>
+                    <div className="h-2"></div>
+                    <p className="text-base font-black uppercase tracking-tight text-gray-900">HCDC Alumni Cafe</p>
                   </div>
 
-                  <div className="border-t border-dashed border-gray-400 py-3 space-y-0.5 relative">
-                    <div className="flex justify-between"><span>Date:</span> <span>{viewingReceipt.date.split('T')[0]}</span></div>
-                    <div className="flex justify-between"><span>Time:</span> <span>{viewingReceipt.time}</span></div>
-                    <div className="flex justify-between"><span>TXN#:</span> <span>{viewingReceipt.id}</span></div>
-                    <div className="flex justify-between"><span>Cashier:</span> <span>{viewingReceipt.cashier}</span></div>
+                  <div className="border-t border-dashed border-gray-400 py-3 space-y-1.5 text-xs relative">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Cashier:</span>
+                      <span className="font-bold">{viewingReceipt.cashier}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Date & Time:</span>
+                      <span className="font-bold">{viewingReceipt.date.split('T')[0]} {viewingReceipt.time}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Transaction Number:</span>
+                      <span className="font-bold">{viewingReceipt.id}</span>
+                    </div>
                   </div>
 
                   <div className="border-t border-gray-400 pt-3 mb-1 font-bold text-[10px] relative">
-                    <div className="flex justify-between gap-4">
-                      <span className="flex-1">ITEM</span>
-                      <span className="w-8 text-center">QTY</span>
-                      <span className="w-20 text-right">AMOUNT</span>
+                    <div className="flex justify-between gap-4 text-gray-500">
+                      <span className="w-10">QTY</span>
+                      <span className="w-20">CATEGORY</span>
+                      <span className="flex-1 text-right">ITEM</span>
                     </div>
                   </div>
-                  <div className="border-b border-gray-400 pb-2 mb-3 relative">
+                  <div className="border-b border-gray-400 pb-2 mb-4 relative">
                     {viewingReceipt.items.map((item, idx) => (
-                      <div key={idx} className="flex justify-between gap-4 py-1 leading-tight">
-                        <span className="flex-1 truncate">{item.name}</span>
-                        <span className="w-8 text-center">{item.quantity}</span>
-                        <span className="w-20 text-right">{(item.price * item.quantity).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <div key={idx} className="flex justify-between gap-4 py-1.5 leading-tight text-[11px]">
+                        <span className="w-10 font-bold">{item.quantity}</span>
+                        <span className="w-20 truncate text-gray-600">{item.category}</span>
+                        <span className="flex-1 text-right font-bold truncate text-gray-900">{item.name}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="space-y-1 mb-4 relative">
-                    <div className="flex justify-between"><span>Subtotal:</span> <span>{viewingReceipt.subtotal.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                    {viewingReceipt.discountType !== 'REGULAR' && (
-                      <div className="flex flex-col text-red-600 italic">
-                        <div className="flex justify-between">
-                          <span>{viewingReceipt.discountType} Disc ({(viewingReceipt.discountRate * 100).toFixed(0)}%):</span>
-                          <span>-{viewingReceipt.discountAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                        {viewingReceipt.customerName && <div className="text-[9px] mt-0.5 text-gray-500 not-italic font-bold">Name: {viewingReceipt.customerName}</div>}
-                        {viewingReceipt.customerIdNumber && <div className="text-[9px] text-gray-500 not-italic font-bold">ID No: {viewingReceipt.customerIdNumber}</div>}
-                      </div>
-                    )}
-                    <div className="flex justify-between"><span>VATable Amt:</span> <span>{(viewingReceipt.total - viewingReceipt.vatAmount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between"><span>VAT (12%):</span> <span>{viewingReceipt.vatAmount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-double border-gray-800 mt-2">
-                      <span>TOTAL:</span>
-                      <span>{viewingReceipt.total.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex justify-between pt-2 text-gray-500">
-                      <span>{viewingReceipt.paymentMethod === 'OR' ? 'OR Payment:' : 'Cash:'}</span> 
-                      <span>{viewingReceipt.cashTendered.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                    {viewingReceipt.paymentMethod === 'OR' && viewingReceipt.orNumber && (
-                      <div className="flex justify-between text-gray-500"><span>OR Number:</span> <span>{viewingReceipt.orNumber}</span></div>
-                    )}
-                    {(!viewingReceipt.paymentMethod || viewingReceipt.paymentMethod === 'Cash') && (
-                      <div className="flex justify-between text-gray-500"><span>Change:</span> <span>{viewingReceipt.change.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span></div>
-                    )}
-                  </div>
-
-                  <div className="text-center space-y-1 mt-6 border-t border-dashed border-gray-400 pt-4 relative">
-                    <p className="font-bold">THANK YOU FOR YOUR PURCHASE</p>
-                    <p>Please come again!</p>
-                    <p className="mt-2 text-[9px] text-gray-400">THIS SERVES AS AN OFFICIAL RECEIPT</p>
+                  <div className="border-t border-dashed border-gray-400 pt-4 text-center relative">
+                    <p className="font-bold text-[10px] text-gray-500 tracking-wider">
+                      THIS IS NOT AN OFFICIAL RECEIPT
+                    </p>
                   </div>
                 </div>
               </div>

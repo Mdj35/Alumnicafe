@@ -870,81 +870,49 @@ export default function App() {
               <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth">
                 {/* Simulated Thermal Receipt */}
                 <div id="receipt-content" className="bg-white p-6 shadow-md mx-auto max-w-[320px] font-mono text-[11px] text-gray-800 border-t-8 border-hcdc-blue">
-                  <div className="text-center space-y-0.5 mb-6">
-                    <p className="text-base font-black uppercase tracking-tight">AlumniCafe</p>
-                    <p>Holy Cross of Davao College</p>
-                    <p>Sta. Ana Ave., Davao City</p>
-                    <p>VAT Reg TIN: 000-000-0000</p>
-                    <p>Tel: (082) 000-0000</p>
+                  <div className="text-center space-y-1 mb-6">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
+                    <p className="text-4xl font-black text-hcdc-blue tracking-tight">{txnNumber.split('-').pop()}</p>
+                    <div className="h-2"></div>
+                    <p className="text-base font-black uppercase tracking-tight text-gray-900">HCDC Alumni Cafe</p>
                   </div>
 
-                  <div className="border-t border-dashed border-gray-400 py-3 space-y-0.5">
-                    <div className="flex justify-between"><span>Date:</span> <span>{formatDate(time)}</span></div>
-                    <div className="flex justify-between"><span>Time:</span> <span>{formatTime(time)}</span></div>
-                    <div className="flex justify-between"><span>TXN#:</span> <span>{txnNumber}</span></div>
-                    <div className="flex justify-between"><span>Cashier:</span> <span>{cashierName}</span></div>
+                  <div className="border-t border-dashed border-gray-400 py-3 space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Cashier:</span>
+                      <span className="font-bold">{cashierName}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Date & Time:</span>
+                      <span className="font-bold">{formatDate(time)} {formatTime(time)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Transaction Number:</span>
+                      <span className="font-bold">{txnNumber}</span>
+                    </div>
                   </div>
 
                   <div className="border-t border-gray-400 pt-3 mb-1 font-bold text-[10px]">
-                    <div className="flex justify-between gap-4">
-                      <span className="flex-1">ITEM</span>
-                      <span className="w-8 text-center">QTY</span>
-                      <span className="w-20 text-right">AMOUNT</span>
+                    <div className="flex justify-between gap-4 text-gray-500">
+                      <span className="w-10">QTY</span>
+                      <span className="w-20">CATEGORY</span>
+                      <span className="flex-1 text-right">ITEM</span>
                     </div>
                   </div>
-                  <div className="border-b border-gray-400 pb-2 mb-3">
+                  <div className="border-b border-gray-400 pb-2 mb-4">
                     {cart.map(item => (
-                      <div key={item.id} className="flex justify-between gap-4 py-1 leading-tight">
-                        <span className="flex-1 truncate">{item.name}</span>
-                        <span className="w-8 text-center">{item.quantity}</span>
-                        <span className="w-20 text-right">{formatCurrency(item.price * item.quantity)}</span>
+                      <div key={item.id} className="flex justify-between gap-4 py-1.5 leading-tight text-[11px]">
+                        <span className="w-10 font-bold">{item.quantity}</span>
+                        <span className="w-20 truncate text-gray-600">{item.category}</span>
+                        <span className="flex-1 text-right font-bold truncate text-gray-900">{item.name}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="space-y-1 mb-4">
-                    <div className="flex justify-between"><span>Subtotal:</span> <span>{formatCurrency(subtotal)}</span></div>
-                    {discountType !== 'REGULAR' && (
-                      <div className="flex justify-between italic">
-                        <span>{discountType} Disc ({discountRate * 100}%):</span>
-                        <span>-{formatCurrency(discountAmount)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between"><span>VATable Amt:</span> <span>{formatCurrency(taxableAmount)}</span></div>
-                    <div className="flex justify-between"><span>VAT (12%):</span> <span>{formatCurrency(vatAmount)}</span></div>
-                    <div className="flex justify-between font-bold text-lg pt-2 border-t border-double border-gray-800">
-                      <span>TOTAL:</span>
-                      <span>{formatCurrency(total)}</span>
-                    </div>
-                    <div className="flex justify-between pt-1">
-                      <span>{paymentMethod === 'OR' ? 'OR Payment:' : 'Cash:'}</span> 
-                      <span>{formatCurrency(paymentMethod === 'OR' ? total : cash)}</span>
-                    </div>
-                    {paymentMethod === 'OR' && orNumber && (
-                      <div className="flex justify-between"><span>OR Number:</span> <span>{orNumber}</span></div>
-                    )}
-                    {paymentMethod === 'Cash' && (
-                      <div className="flex justify-between"><span>Change:</span> <span>{formatCurrency(change)}</span></div>
-                    )}
-                  </div>
-
-                  <div className="border-t border-dashed border-gray-400 py-3 text-center space-y-1">
-                    {discountType !== 'REGULAR' && (
-                      <div className="mb-2">
-                        <p className="font-bold">Discount: {discountType} ({discountRate * 100}%)</p>
-                        <p className="text-[9px] leading-tight opacity-70 whitespace-pre-wrap">
-                          {discountType === 'ALUMNI' ?
-                            'Privilege under HCDC\nAlumni Privilege Program' :
-                            `Privilege under ${discountType === 'PWD' ? 'RA 7277' : 'RA 9994'}`
-                          }
-                        </p>
-                        {customerName && <p className="text-[10px] mt-1">Name: {customerName}</p>}
-                        {customerIdNumber && <p className="text-[10px]">ID No: {customerIdNumber}</p>}
-                      </div>
-                    )}
-                    <p className="font-bold text-[12px] leading-tight mt-4 italic">Salamat sa inyong pagbisita!</p>
-                    <p className="text-[10px]">Blaze your Trail to Success!</p>
-                    <p className="text-[9px] mt-2 opacity-60">This is your Official Receipt.</p>
+                  <div className="border-t border-dashed border-gray-400 pt-4 text-center">
+                    <p className="font-bold text-[10px] text-gray-500 tracking-wider">
+                      THIS IS NOT AN OFFICIAL RECEIPT
+                    </p>
                   </div>
                 </div>
               </div>
