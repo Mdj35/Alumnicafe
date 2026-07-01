@@ -1343,7 +1343,7 @@ export default function AdminDashboard() {
                           </span>
                         </td>
 
-                        <td className="p-6 text-right flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <td className="p-6 text-right flex justify-end gap-2 transition-opacity">
                           <button onClick={() => openEditCashier(acc)} className="p-2 text-hcdc-blue bg-hcdc-light-blue hover:bg-hcdc-blue hover:text-white rounded-xl transition-all" title="Edit">
                             <Edit3 className="w-4 h-4" />
                           </button>
@@ -1611,7 +1611,7 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                     {/* Action buttons */}
-                    <div className="absolute top-4 right-4 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-4 right-4 flex gap-1.5 transition-opacity">
                       <button
                         onClick={() => openEditModal(item)}
                         className="w-8 h-8 rounded-full bg-hcdc-light-blue text-hcdc-blue flex items-center justify-center hover:bg-hcdc-blue hover:text-white transition-all"
@@ -1689,7 +1689,7 @@ export default function AdminDashboard() {
                           <span className="text-xl font-black text-hcdc-blue tabular-nums shrink-0">
                             {stock.quantity.toLocaleString()} {stock.unit}
                           </span>
-                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <div className="flex gap-1.5 transition-opacity shrink-0">
                             <button
                               onClick={() => initiateInvAuth('edit', stock.id)}
                               title="Edit ingredient"
@@ -1732,7 +1732,7 @@ export default function AdminDashboard() {
                           <span className="text-xl font-black text-hcdc-blue tabular-nums shrink-0">
                             {stock.quantity.toLocaleString()} {stock.unit}
                           </span>
-                          <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                          <div className="flex gap-1.5 transition-opacity shrink-0">
                             <button
                               onClick={() => initiateInvAuth('edit', stock.id)}
                               title="Edit ingredient"
@@ -2493,7 +2493,7 @@ export default function AdminDashboard() {
                       <span className="font-bold text-gray-700">{cat}</span>
                       <button
                         onClick={() => handleDeleteCat(cat)}
-                        className="p-2 text-gray-300 hover:text-hcdc-red transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-2 text-gray-300 hover:text-hcdc-red transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>

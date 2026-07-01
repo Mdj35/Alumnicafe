@@ -4,7 +4,7 @@ import { saveTransaction, updateCashierNames } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
 import { getInventory, saveInventory, Inventory } from './inventoryStorage';
-import { saveCashCount } from './cashCountStorage';
+import { saveCashCount, getCashCounts, CashCountRecord } from './cashCountStorage';
 import {
   Coffee,
   ChevronRight,
@@ -57,6 +57,24 @@ export default function App() {
     if (!isAuth) {
       navigate('/login');
     } else {
+      // Check for cash count verification
+      const verifyCheck = async () => {
+        // Skip for Admin
+        if (localStorage.getItem('cashier_role') === 'Admin') return;
+        
+        const verifiedFlag = sessionStorage.getItem('cashCountVerified');
+        if (!verifiedFlag) {
+          const counts = await getCashCounts();
+          if (counts.length > 0) {
+            setPreviousCashCount(counts[0]);
+            setShowVerifyCashCountModal(true);
+          } else {
+            sessionStorage.setItem('cashCountVerified', 'true');
+          }
+        }
+      };
+      verifyCheck();
+
       // Migrate legacy staff name to current cashier name
       const name = localStorage.getItem('cashier_name');
       if (name) {
@@ -141,6 +159,14 @@ export default function App() {
       return sum + (val * (qty as number));
     }, 0);
   }, [cashDenominations]);
+
+  const [showVerifyCashCountModal, setShowVerifyCashCountModal] = useState(false);
+  const [previousCashCount, setPreviousCashCount] = useState<CashCountRecord | null>(null);
+
+  const confirmCashCountVerification = () => {
+    sessionStorage.setItem('cashCountVerified', 'true');
+    setShowVerifyCashCountModal(false);
+  };
 
   // --- Effects ---
   useEffect(() => {
@@ -549,7 +575,7 @@ export default function App() {
                   </AnimatePresence>
 
                   {!isOut && (
-                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="absolute top-4 right-4 transition-opacity">
                       <div className="w-8 h-8 rounded-full bg-hcdc-red text-white flex items-center justify-center">
                         <Plus className="w-4 h-4" />
                       </div>
@@ -631,7 +657,7 @@ export default function App() {
                   <div className="flex flex-col items-center justify-between">
                     <button
                       onClick={() => updateQuantity(item.id, -item.quantity)}
-                      className="w-6 h-6 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-hcdc-red hover:text-white transition-all shadow-sm self-end opacity-0 group-hover:opacity-100 absolute -top-2 -right-2"
+                      className="w-6 h-6 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-hcdc-red hover:text-white transition-all shadow-sm self-end absolute -top-2 -right-2"
                     >
                       <X className="w-3 h-3" />
                     </button>
@@ -1014,6 +1040,44 @@ export default function App() {
                     className="flex-[2] h-12 bg-hcdc-red text-white font-bold rounded-xl hover:bg-[#A01E1F] shadow-lg shadow-hcdc-red/20 transition-all disabled:opacity-30 uppercase tracking-widest text-xs"
                   >
                     Submit & Logout
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* VERIFY CASH COUNT MODAL */}
+      <AnimatePresence>
+        {showVerifyCashCountModal && previousCashCount && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden border border-gray-100 my-auto"
+            >
+              <div className="bg-hcdc-blue p-8 text-white text-center shrink-0">
+                <h3 className="text-xl font-black">Verify Previous Shift Cash Count</h3>
+                <p className="text-sm text-white/60 mt-1 uppercase tracking-widest font-bold">
+                  Reported by {previousCashCount.cashier} at {previousCashCount.time}
+                </p>
+                <div className="mt-4 text-4xl font-black tracking-tighter">
+                  {formatCurrency(previousCashCount.amount)}
+                </div>
+              </div>
+              <div className="p-8 space-y-4 text-center">
+                <p className="text-sm text-gray-500 font-medium">
+                  Please verify that the physical cash in the drawer matches the reported amount before starting your shift.
+                </p>
+                
+                <div className="flex gap-3 pt-4 border-t border-gray-100 mt-6">
+                  <button
+                    onClick={confirmCashCountVerification}
+                    className="w-full h-12 bg-hcdc-blue text-white font-bold rounded-xl hover:bg-hcdc-blue-dark shadow-lg shadow-hcdc-blue/20 transition-all uppercase tracking-widest text-xs flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> I Confirm the Amount is Correct
                   </button>
                 </div>
               </div>
