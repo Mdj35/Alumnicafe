@@ -196,10 +196,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const savedTxn = sessionStorage.getItem('lastTxn') || '0';
-    const nextTxn = (parseInt(savedTxn) + 1).toString().padStart(4, '0');
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    setTxnNumber(`TXN-${dateStr}-${nextTxn}`);
+    const now = new Date();
+    const businessDate = new Date(now);
+    if (now.getHours() < 7) {
+      businessDate.setDate(businessDate.getDate() - 1);
+    }
+    const dateStr = businessDate.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    const savedDate = localStorage.getItem('txnBusinessDate');
+    let nextTxnNum = 1;
+    
+    if (savedDate === dateStr) {
+      const savedTxn = localStorage.getItem('lastTxn') || '0';
+      nextTxnNum = parseInt(savedTxn) + 1;
+    } else {
+      nextTxnNum = 1;
+      localStorage.setItem('txnBusinessDate', dateStr);
+      localStorage.setItem('lastTxn', '0');
+    }
+
+    const nextTxnStr = nextTxnNum.toString().padStart(4, '0');
+    setTxnNumber(`TXN-${dateStr}-${nextTxnStr}`);
   }, [showReceipt]);
 
   // --- Calculations ---
@@ -360,7 +377,7 @@ export default function App() {
 
   const startNewTransaction = () => {
     const lastNum = txnNumber.split('-').pop() || '0';
-    sessionStorage.setItem('lastTxn', parseInt(lastNum).toString());
+    localStorage.setItem('lastTxn', parseInt(lastNum).toString());
     setCart([]);
     setDiscountType('REGULAR');
     setCustomerName('');
