@@ -405,9 +405,9 @@ export default function App() {
 
   // --- UI Components ---
   return (
-    <div className="flex flex-col h-screen select-none no-print">
+    <div className="flex flex-col h-screen select-none print:block print:h-auto print:bg-white">
       {/* Header Bar */}
-      <header className="h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-10 text-white shadow-xl shrink-0 z-20">
+      <header className="no-print h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-10 text-white shadow-xl shrink-0 z-20">
         <div className="flex items-center gap-5">
           <div className="bg-white p-2 rounded-xl shadow-lg">
             <span className="text-2xl leading-none">🦅</span>
@@ -459,8 +459,10 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex flex-1 overflow-hidden relative">
-        {/* PANEL 1: Categories sidebar */}
+      {/* Main Content */}
+      <div className="no-print flex flex-1 overflow-hidden">
+        
+        {/* Left Side: Categories & Products */}
         <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 shadow-sm z-10">
           <div className="p-6">
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-6 flex items-center gap-3">
@@ -781,7 +783,7 @@ export default function App() {
             </button>
           </div>
         </aside>
-      </main>
+      </div>
 
       {/* PAYMENT MODAL */}
       <AnimatePresence>
@@ -898,19 +900,19 @@ export default function App() {
       {/* RECEIPT MODAL */}
       <AnimatePresence>
         {showReceipt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 print:bg-transparent">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 print:static print:bg-transparent print:p-0 print:block">
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl w-full max-w-md h-[90vh] flex flex-col shadow-2xl overflow-hidden"
+              className="bg-white rounded-3xl w-full max-w-md h-[90vh] flex flex-col shadow-2xl overflow-hidden print:shadow-none print:h-auto print:rounded-none print:max-w-none print:w-full print:block"
             >
-              <div className="p-4 flex justify-between items-center border-b border-gray-100 shrink-0">
+              <div className="no-print p-4 flex justify-between items-center border-b border-gray-100 shrink-0">
                 <h3 className="font-bold flex items-center gap-2"><CheckCircle2 className="text-green-500" /> Transaction Complete</h3>
                 <button onClick={() => setShowReceipt(false)} className="p-2 hover:bg-gray-100 rounded-full"><X /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth">
+              <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth print:overflow-visible print:p-0 print:bg-white print:block">
                 {/* Simulated Thermal Receipt */}
                 <div id="receipt-content" className="bg-white p-6 shadow-md mx-auto max-w-[320px] font-mono text-[11px] text-gray-800 border-t-8 border-hcdc-blue">
                   <div className="text-center space-y-1 mb-6">
@@ -920,47 +922,59 @@ export default function App() {
                     <p className="text-base font-black uppercase tracking-tight text-gray-900">HCDC Alumni Cafe</p>
                   </div>
 
-                  <div className="border-t border-dashed border-gray-400 py-3 space-y-1.5 text-xs">
+                  <div className="border-t border-dashed border-black py-3 space-y-1.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Cashier:</span>
+                      <span className="text-gray-800">Cashier:</span>
                       <span className="font-bold">{cashierName}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Date & Time:</span>
+                      <span className="text-gray-800">Date & Time:</span>
                       <span className="font-bold">{formatDate(time)} {formatTime(time)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Transaction Number:</span>
+                      <span className="text-gray-800">Transaction Number:</span>
                       <span className="font-bold">{txnNumber}</span>
                     </div>
+                    {discountType !== 'REGULAR' && (
+                      <>
+                        <div className="flex justify-between mt-2 pt-2 border-t border-dashed border-black">
+                          <span className="text-gray-800">Customer Name:</span>
+                          <span className="font-bold">{customerName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-800">{discountType} ID:</span>
+                          <span className="font-bold">{customerIdNumber}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  <div className="border-t border-gray-400 pt-3 mb-1 font-bold text-[10px]">
-                    <div className="flex justify-between gap-4 text-gray-500">
+                  <div className="border-t border-black pt-3 mb-1 font-bold text-[10px]">
+                    <div className="flex justify-between gap-4 text-gray-800">
                       <span className="w-10">QTY</span>
                       <span className="w-20">CATEGORY</span>
                       <span className="flex-1 text-right">ITEM</span>
                     </div>
                   </div>
-                  <div className="border-b border-gray-400 pb-2 mb-4">
+                  <div className="border-b border-black pb-2 mb-4">
                     {cart.map(item => (
                       <div key={item.id} className="flex justify-between gap-4 py-1.5 leading-tight text-[11px]">
                         <span className="w-10 font-bold">{item.quantity}</span>
-                        <span className="w-20 truncate text-gray-600">{item.category}</span>
-                        <span className="flex-1 text-right font-bold truncate text-gray-900">{item.name}</span>
+                        <span className="w-20 truncate text-gray-800">{item.category}</span>
+                        <span className="flex-1 text-right font-bold truncate text-black">{item.name}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="border-t border-dashed border-gray-400 pt-4 text-center">
-                    <p className="font-bold text-[10px] text-gray-500 tracking-wider">
+                  <div className="border-t border-dashed border-black pt-4 text-center">
+                    <p className="font-bold text-[10px] text-gray-800 tracking-wider">
                       THIS IS NOT AN OFFICIAL RECEIPT
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div className="p-6 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
+              <div className="no-print p-6 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
                 <button
                   onClick={() => window.print()}
                   className="w-full h-12 bg-gray-800 hover:bg-black text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
