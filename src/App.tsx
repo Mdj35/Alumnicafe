@@ -24,10 +24,13 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronUp,
-  LayoutDashboard
+  LayoutDashboard,
+  UtensilsCrossed
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
+import cafeLogo from './CAFE.jpg';
+
 
 // --- Types ---
 interface Product {
@@ -61,7 +64,7 @@ export default function App() {
       const verifyCheck = async () => {
         // Skip for Admin
         if (localStorage.getItem('cashier_role') === 'Admin') return;
-        
+
         const verifiedFlag = sessionStorage.getItem('cashCountVerified');
         if (!verifiedFlag) {
           const counts = await getCashCounts();
@@ -144,7 +147,7 @@ export default function App() {
   const [products, setProducts] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [inventory, setInventory] = useState<Inventory>([]);
-  
+
   const [newProduct, setNewProduct] = useState({ name: '', price: 0, category: 'Coffee', icon: '☕' });
 
   const [showCashCountModal, setShowCashCountModal] = useState(false);
@@ -188,10 +191,10 @@ export default function App() {
     const timer = setInterval(() => setTime(new Date()), 1000);
     // Refresh menu items periodically in case admin changes them
     const refresh = setInterval(loadData, 2000);
-    return () => { 
+    return () => {
       isMounted = false;
-      clearInterval(timer); 
-      clearInterval(refresh); 
+      clearInterval(timer);
+      clearInterval(refresh);
     };
   }, []);
 
@@ -202,10 +205,10 @@ export default function App() {
       businessDate.setDate(businessDate.getDate() - 1);
     }
     const dateStr = businessDate.toISOString().slice(0, 10).replace(/-/g, '');
-    
+
     const savedDate = localStorage.getItem('txnBusinessDate');
     let nextTxnNum = 1;
-    
+
     if (savedDate === dateStr) {
       const savedTxn = localStorage.getItem('lastTxn') || '0';
       nextTxnNum = parseInt(savedTxn) + 1;
@@ -326,7 +329,7 @@ export default function App() {
       return;
     }
     const cash = parseFloat(cashTendered) || 0;
-    
+
     if (paymentMethod === 'Cash' && cash < total) {
       alert('Insufficient cash tendered!');
       return;
@@ -447,7 +450,7 @@ export default function App() {
               <div className="w-10 h-10 rounded-xl bg-hcdc-gold flex items-center justify-center text-hcdc-blue font-black text-sm shadow-lg">
                 {cashierName.charAt(0).toUpperCase()}
               </div>
-              <button 
+              <button
                 onClick={handleLogout}
                 className="w-10 h-10 rounded-xl bg-white/10 hover:bg-hcdc-red flex items-center justify-center text-white transition-colors"
                 title="Logout"
@@ -461,7 +464,7 @@ export default function App() {
 
       {/* Main Content */}
       <div className="no-print flex flex-1 overflow-hidden">
-        
+
         {/* Left Side: Categories & Products */}
         <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 shadow-sm z-10">
           <div className="p-6">
@@ -472,8 +475,8 @@ export default function App() {
               <button
                 onClick={() => setCurrentCategory('All Items')}
                 className={`flex items-center gap-5 px-6 py-4 rounded-2xl transition-all duration-300 group text-left relative overflow-hidden ${currentCategory === 'All Items'
-                    ? 'bg-hcdc-blue text-white shadow-xl shadow-hcdc-blue/20 translate-x-1'
-                    : 'hover:bg-hcdc-light-blue text-gray-500 hover:text-hcdc-blue'
+                  ? 'bg-hcdc-blue text-white shadow-xl shadow-hcdc-blue/20 translate-x-1'
+                  : 'hover:bg-hcdc-light-blue text-gray-500 hover:text-hcdc-blue'
                   }`}
               >
                 {currentCategory === 'All Items' && (
@@ -486,8 +489,8 @@ export default function App() {
                   key={cat}
                   onClick={() => setCurrentCategory(cat)}
                   className={`flex items-center gap-5 px-6 py-4 rounded-2xl transition-all duration-300 group text-left relative overflow-hidden ${currentCategory === cat
-                      ? 'bg-hcdc-blue text-white shadow-xl shadow-hcdc-blue/20 translate-x-1'
-                      : 'hover:bg-hcdc-light-blue text-gray-500 hover:text-hcdc-blue'
+                    ? 'bg-hcdc-blue text-white shadow-xl shadow-hcdc-blue/20 translate-x-1'
+                    : 'hover:bg-hcdc-light-blue text-gray-500 hover:text-hcdc-blue'
                     }`}
                 >
                   {currentCategory === cat && (
@@ -545,62 +548,62 @@ export default function App() {
                     if (servings < minServings) minServings = servings;
                   });
                 }
-                
+
                 const isOut = hasInventoryTracking && minServings <= 0;
 
                 return (
-                <motion.div
-                  key={product.id}
-                  whileHover={{ y: isOut ? 0 : -5, shadow: isOut ? "none" : "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)" }}
-                  whileTap={{ scale: isOut ? 1 : 0.98 }}
-                  onClick={() => !isOut && addToCart(product)}
-                  className={`bg-white rounded-3xl p-5 border border-gray-50 shadow-sm transition-all group relative overflow-hidden ${isOut ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-hcdc-blue/20 cursor-pointer'}`}
-                >
-                  <div className="flex flex-col items-center text-center gap-3">
-                    <div className="w-16 h-16 rounded-2xl bg-hcdc-light-blue flex items-center justify-center group-hover:bg-white group-hover:scale-105 transition-all duration-300 shadow-inner group-hover:shadow-md overflow-hidden relative">
-                      {product.image ? (
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-4xl">{product.icon}</span>
-                      )}
-                      {hasInventoryTracking && (
-                        <div className={`absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 ${isOut ? 'bg-red-500 text-white' : 'bg-hcdc-blue/90 text-white backdrop-blur-sm'}`}>
-                          {isOut ? 'Sold Out' : isFinite(minServings) ? `${minServings} left` : ''}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-800 text-xs leading-snug h-10 flex items-center justify-center px-1">{product.name}</h3>
-                      <p className="text-hcdc-red font-black text-lg mt-1 tracking-tight">{formatCurrency(product.price)}</p>
-                    </div>
-                    <div className="px-4 py-1.5 bg-gray-50 group-hover:bg-hcdc-blue group-hover:text-white text-gray-400 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] transition-colors">
-                      {product.category}
-                    </div>
-                  </div>
-
-                  {/* Floating +1 animation */}
-                  <AnimatePresence>
-                    {animations.map(anim => anim.id === product.id && (
-                      <motion.div
-                        key={anim.key}
-                        initial={{ opacity: 1, y: 0 }}
-                        animate={{ opacity: 0, y: -120 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                      >
-                        <span className="text-3xl font-black text-hcdc-red drop-shadow-md">+1</span>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-
-                  {!isOut && (
-                    <div className="absolute top-4 right-4 transition-opacity">
-                      <div className="w-8 h-8 rounded-full bg-hcdc-red text-white flex items-center justify-center">
-                        <Plus className="w-4 h-4" />
+                  <motion.div
+                    key={product.id}
+                    whileHover={{ y: isOut ? 0 : -5, shadow: isOut ? "none" : "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)" }}
+                    whileTap={{ scale: isOut ? 1 : 0.98 }}
+                    onClick={() => !isOut && addToCart(product)}
+                    className={`bg-white rounded-3xl p-5 border border-gray-50 shadow-sm transition-all group relative overflow-hidden ${isOut ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-hcdc-blue/20 cursor-pointer'}`}
+                  >
+                    <div className="flex flex-col items-center text-center gap-3">
+                      <div className="w-16 h-16 rounded-2xl bg-hcdc-light-blue flex items-center justify-center group-hover:bg-white group-hover:scale-105 transition-all duration-300 shadow-inner group-hover:shadow-md overflow-hidden relative">
+                        {product.image ? (
+                          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-4xl">{product.icon}</span>
+                        )}
+                        {hasInventoryTracking && (
+                          <div className={`absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 ${isOut ? 'bg-red-500 text-white' : 'bg-hcdc-blue/90 text-white backdrop-blur-sm'}`}>
+                            {isOut ? 'Sold Out' : isFinite(minServings) ? `${minServings} left` : ''}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-gray-800 text-xs leading-snug h-10 flex items-center justify-center px-1">{product.name}</h3>
+                        <p className="text-hcdc-red font-black text-lg mt-1 tracking-tight">{formatCurrency(product.price)}</p>
+                      </div>
+                      <div className="px-4 py-1.5 bg-gray-50 group-hover:bg-hcdc-blue group-hover:text-white text-gray-400 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] transition-colors">
+                        {product.category}
                       </div>
                     </div>
-                  )}
-                </motion.div>
+
+                    {/* Floating +1 animation */}
+                    <AnimatePresence>
+                      {animations.map(anim => anim.id === product.id && (
+                        <motion.div
+                          key={anim.key}
+                          initial={{ opacity: 1, y: 0 }}
+                          animate={{ opacity: 0, y: -120 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                        >
+                          <span className="text-3xl font-black text-hcdc-red drop-shadow-md">+1</span>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+
+                    {!isOut && (
+                      <div className="absolute top-4 right-4 transition-opacity">
+                        <div className="w-8 h-8 rounded-full bg-hcdc-red text-white flex items-center justify-center">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                      </div>
+                    )}
+                  </motion.div>
                 );
               })}
             </div>
@@ -715,11 +718,11 @@ export default function App() {
                     key={type}
                     onClick={() => setDiscountType(type)}
                     className={`py-2 rounded-xl text-[9px] font-black border-2 transition-all flex flex-col items-center justify-center gap-0.5 ${discountType === type
-                        ? type === 'PWD' ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30' :
-                          type === 'SENIOR' ? 'bg-hcdc-gold border-hcdc-gold text-white shadow-lg shadow-hcdc-gold/30' :
-                            type === 'ALUMNI' ? 'bg-hcdc-blue border-hcdc-blue text-white shadow-lg shadow-hcdc-blue/30' :
-                              'bg-gray-800 border-gray-800 text-white shadow-lg'
-                        : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50'
+                      ? type === 'PWD' ? 'bg-purple-600 border-purple-600 text-white shadow-lg shadow-purple-600/30' :
+                        type === 'SENIOR' ? 'bg-hcdc-gold border-hcdc-gold text-white shadow-lg shadow-hcdc-gold/30' :
+                          type === 'ALUMNI' ? 'bg-hcdc-blue border-hcdc-blue text-white shadow-lg shadow-hcdc-blue/30' :
+                            'bg-gray-800 border-gray-800 text-white shadow-lg'
+                      : 'bg-white border-gray-100 text-gray-400 hover:border-gray-200 hover:bg-gray-50'
                       }`}
                   >
                     <span>{type === 'REGULAR' ? 'NONE' : type}</span>
@@ -914,60 +917,66 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth print:overflow-visible print:p-0 print:bg-white print:block">
                 {/* Simulated Thermal Receipt */}
-                <div id="receipt-content" className="bg-white p-6 shadow-md mx-auto max-w-[320px] font-mono text-[11px] text-gray-800 border-t-8 border-hcdc-blue">
-                  <div className="text-center space-y-1 mb-6">
+                <div id="receipt-content" className="bg-white p-6 shadow-md mx-auto max-w-[320px] font-mono text-[11px] text-gray-800 border-t-8 border-hcdc-blue relative">
+                  {/* Background watermark */}
+                  <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none">
+                    <UtensilsCrossed className="w-48 h-48" />
+                  </div>
+
+                  <div className="text-center space-y-1 mb-6 relative">
+                    <img src={cafeLogo} alt="HCDC Logo" className="w-16 h-16 mx-auto mb-2" />
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
                     <p className="text-4xl font-black text-hcdc-blue tracking-tight">{txnNumber.split('-').pop()}</p>
                     <div className="h-2"></div>
                     <p className="text-base font-black uppercase tracking-tight text-gray-900">HCDC Alumni Cafe</p>
                   </div>
 
-                  <div className="border-t border-dashed border-black py-3 space-y-1.5 text-xs">
+                  <div className="border-t border-dashed border-gray-400 py-3 space-y-1.5 text-xs relative">
                     <div className="flex justify-between">
-                      <span className="text-gray-800">Cashier:</span>
+                      <span className="text-gray-500">Cashier:</span>
                       <span className="font-bold">{cashierName}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-800">Date & Time:</span>
-                      <span className="font-bold">{formatDate(time)} {formatTime(time)}</span>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-gray-500 shrink-0">Date & Time:</span>
+                      <span className="font-bold text-right">{formatDate(time)} {formatTime(time)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-800">Transaction Number:</span>
+                      <span className="text-gray-500">Transaction Number:</span>
                       <span className="font-bold">{txnNumber}</span>
                     </div>
                     {discountType !== 'REGULAR' && (
                       <>
-                        <div className="flex justify-between mt-2 pt-2 border-t border-dashed border-black">
-                          <span className="text-gray-800">Customer Name:</span>
+                        <div className="flex justify-between mt-2 pt-2 border-t border-dashed border-gray-400">
+                          <span className="text-gray-500">Customer Name:</span>
                           <span className="font-bold">{customerName}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-800">{discountType} ID:</span>
+                          <span className="text-gray-500">{discountType} ID:</span>
                           <span className="font-bold">{customerIdNumber}</span>
                         </div>
                       </>
                     )}
                   </div>
 
-                  <div className="border-t border-black pt-3 mb-1 font-bold text-[10px]">
-                    <div className="flex justify-between gap-4 text-gray-800">
+                  <div className="border-t border-gray-400 pt-3 mb-1 font-bold text-[10px] relative">
+                    <div className="flex justify-between gap-4 text-gray-500">
                       <span className="w-10">QTY</span>
                       <span className="w-20">CATEGORY</span>
                       <span className="flex-1 text-right">ITEM</span>
                     </div>
                   </div>
-                  <div className="border-b border-black pb-2 mb-4">
+                  <div className="border-b border-gray-400 pb-2 mb-4 relative">
                     {cart.map(item => (
                       <div key={item.id} className="flex justify-between gap-4 py-1.5 leading-tight text-[11px]">
                         <span className="w-10 font-bold">{item.quantity}</span>
-                        <span className="w-20 truncate text-gray-800">{item.category}</span>
-                        <span className="flex-1 text-right font-bold truncate text-black">{item.name}</span>
+                        <span className="w-20 truncate text-gray-600">{item.category}</span>
+                        <span className="flex-1 text-right font-bold truncate text-gray-900">{item.name}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="border-t border-dashed border-black pt-4 text-center">
-                    <p className="font-bold text-[10px] text-gray-800 tracking-wider">
+                  <div className="border-t border-dashed border-gray-400 pt-4 text-center relative">
+                    <p className="font-bold text-[10px] text-gray-500 tracking-wider">
                       THIS IS NOT AN OFFICIAL RECEIPT
                     </p>
                   </div>
@@ -1042,7 +1051,7 @@ export default function App() {
                 <div className="pt-4 border-t border-gray-100 mt-6">
                   <div className="flex items-center gap-3 bg-hcdc-light-blue/20 p-3 rounded-2xl border border-hcdc-blue/20">
                     <div className="text-right font-black text-hcdc-blue text-[10px] uppercase tracking-widest leading-tight">
-                      Total OR<br/>Amount
+                      Total OR<br />Amount
                     </div>
                     <div className="relative flex-1">
                       <div className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-hcdc-blue">₱</div>
@@ -1057,7 +1066,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-3 pt-4 border-t border-gray-100 mt-6">
                   <button
                     onClick={cancelLogout}
@@ -1102,7 +1111,7 @@ export default function App() {
                 <p className="text-sm text-gray-500 font-medium">
                   Please verify that the physical cash in the drawer matches the reported amount before starting your shift.
                 </p>
-                
+
                 <div className="flex gap-3 pt-4 border-t border-gray-100 mt-6">
                   <button
                     onClick={confirmCashCountVerification}
@@ -1118,7 +1127,7 @@ export default function App() {
       </AnimatePresence>
 
       {/* Off-screen Receipt for Printing (always present in DOM for print media query) */}
-      
+
 
     </div>
   );

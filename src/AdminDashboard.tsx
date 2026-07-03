@@ -30,6 +30,7 @@ import {
   Minus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import cafeLogo from './CAFE.jpg';
 import * as XLSX from 'xlsx-js-style';
 import {
   XAxis,
@@ -1029,9 +1030,9 @@ export default function AdminDashboard() {
   const totalCashiersCount = cashiers.length;
 
   return (
-    <div className="flex flex-col h-screen select-none">
+    <div className="flex flex-col h-screen select-none print:block print:h-auto print:bg-white">
       {/* Admin Header */}
-      <header className="h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-10 text-white shadow-xl shrink-0 z-20">
+      <header className="no-print h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-10 text-white shadow-xl shrink-0 z-20">
         <div className="flex items-center gap-5">
           <Link to="/" className="flex items-center gap-3 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl transition-all border border-white/10">
             <ArrowLeft className="w-4 h-4" />
@@ -1056,7 +1057,7 @@ export default function AdminDashboard() {
         </div>
       </header>
 
-      <div className="flex-1 bg-[#F9FAFB] p-10 flex flex-col overflow-hidden">
+      <div className="no-print flex-1 bg-[#F9FAFB] p-10 flex flex-col overflow-hidden">
         {/* Admin Header */}
         <div className="flex justify-between items-end mb-8 shrink-0">
           <div>
@@ -2298,19 +2299,19 @@ export default function AdminDashboard() {
       {/* RECEIPT MODAL */}
       <AnimatePresence>
         {viewingReceipt && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm print:bg-transparent print:backdrop-blur-none">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm print:static print:bg-transparent print:p-0 print:block">
             <motion.div
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100"
+              className="bg-white rounded-[2.5rem] w-full max-w-md max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-100 print:shadow-none print:h-auto print:rounded-none print:max-w-none print:w-full print:block print:border-none"
             >
-              <div className="bg-hcdc-blue p-6 text-white flex justify-between items-center shrink-0">
+              <div className="bg-hcdc-blue p-6 text-white flex justify-between items-center shrink-0 no-print">
                 <h3 className="font-bold flex items-center gap-2"><Receipt className="w-5 h-5" /> Transaction Receipt</h3>
                 <button onClick={() => setViewingReceipt(null)} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"><X className="w-4 h-4" /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 bg-[#F9FAFB] scroll-smooth custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-8 bg-[#F9FAFB] scroll-smooth custom-scrollbar print:overflow-visible print:p-0 print:bg-white print:block">
                 {/* Simulated Thermal Receipt */}
                 <div id="receipt-content" className="bg-white p-6 shadow-md mx-auto max-w-[320px] font-mono text-[11px] text-gray-800 border-t-8 border-hcdc-blue relative">
                   {/* Background watermark */}
@@ -2319,6 +2320,7 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="text-center space-y-1 mb-6 relative">
+                    <img src={cafeLogo} alt="HCDC Logo" className="w-16 h-16 mx-auto mb-2" />
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
                     <p className="text-4xl font-black text-hcdc-blue tracking-tight">{viewingReceipt.id.split('-').pop()}</p>
                     <div className="h-2"></div>
@@ -2330,9 +2332,9 @@ export default function AdminDashboard() {
                       <span className="text-gray-500">Cashier:</span>
                       <span className="font-bold">{viewingReceipt.cashier}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Date & Time:</span>
-                      <span className="font-bold">{viewingReceipt.date.split('T')[0]} {viewingReceipt.time}</span>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-gray-500 shrink-0">Date & Time:</span>
+                      <span className="font-bold text-right">{new Date(viewingReceipt.date).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })} {viewingReceipt.time}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Transaction Number:</span>
@@ -2365,7 +2367,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-gray-100 shrink-0 bg-white">
+              <div className="p-6 border-t border-gray-100 shrink-0 bg-white no-print">
                 <button
                   onClick={() => window.print()}
                   className="w-full bg-hcdc-blue hover:bg-hcdc-blue-dark text-white font-black py-4 rounded-xl flex items-center justify-center gap-2 transition-all"
