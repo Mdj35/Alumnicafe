@@ -23,8 +23,9 @@ export interface TransactionRecord {
   customerName?: string;
   customerIdNumber?: string;
   status?: 'Completed' | 'Voided';
-  paymentMethod?: 'Cash' | 'OR';
+  paymentMethod?: 'Cash' | 'OR' | 'Online';
   orNumber?: string;
+  onlineReference?: string;
 }
 
 const TRANSACTIONS_COLLECTION = 'transactions';

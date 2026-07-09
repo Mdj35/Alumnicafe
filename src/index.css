@@ -76,3 +76,9 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* Always show number input arrows for tablet users */
+.always-show-spinners::-webkit-inner-spin-button,
+.always-show-spinners::-webkit-outer-spin-button {
+  opacity: 1 !important;
+}

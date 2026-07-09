@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -44,8 +45,14 @@ import {
 import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, MenuItem, getMenuCategories, addMenuCategory, deleteMenuCategory } from './menuStorage';
 import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
 import { getCashiers, addCashier, updateCashier, deleteCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
-import { getInventoryItems, InventoryItem } from './inventoryManager';
+import { getCashCounts, CashCountRecord } from './cashCountStorage';
+import { getInventoryItems, InventoryItem, deleteInventoryItem } from './inventoryManager';
 import InventoryDashboard from './components/inventory/InventoryDashboard';
+
+// Legacy dummy implementations to satisfy unused inventory handlers
+type Inventory = any[];
+const saveInventory = async (data: any) => {};
+const addInventoryLog = async (data: any) => [];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -81,6 +88,9 @@ export default function AdminDashboard() {
 
   // Cashier state
   const [cashiers, setCashiers] = useState<CashierAccount[]>([]);
+  const [cashCounts, setCashCounts] = useState<CashCountRecord[]>([]);
+  const [showCashierReportList, setShowCashierReportList] = useState(false);
+  const [selectedCashCount, setSelectedCashCount] = useState<CashCountRecord | null>(null);
   const [showCashierModal, setShowCashierModal] = useState(false);
   const [editingCashier, setEditingCashier] = useState<CashierAccount | null>(null);
   const [cashierForm, setCashierForm] = useState({ name: '', usernamePrefix: '', role: 'Cashier' });
@@ -97,7 +107,7 @@ export default function AdminDashboard() {
   const [reportCashierFilter, setReportCashierFilter] = useState('All');
 
   // Inventory state
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inventory, setInventory] = useState<any[]>([]);
   const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
   const [inventoryLogPeriod, setInventoryLogPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'specific'>('all');
   const [inventorySpecificDate, setInventorySpecificDate] = useState('');
@@ -129,12 +139,13 @@ export default function AdminDashboard() {
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      const [m, t, c, cat, i] = await Promise.all([
+      const [m, t, c, cat, i, cc] = await Promise.all([
         getMenuItems(),
         getTransactions(),
         getCashiers(),
         getMenuCategories(),
-        getInventoryItems()
+        getInventoryItems(),
+        getCashCounts()
       ]);
       if (isMounted) {
         setMenuItems(m);
@@ -142,6 +153,7 @@ export default function AdminDashboard() {
         setCashiers(c);
         setCategories(cat);
         setInventory(i);
+        setCashCounts(cc);
       }
     };
     loadData();
@@ -1297,9 +1309,14 @@ export default function AdminDashboard() {
                   <h3 className="text-xl font-black text-gray-800">Manage Accounts</h3>
                   <p className="text-xs text-gray-500 font-medium mt-1">Add, edit, or disable cashier access.</p>
                 </div>
-                <button onClick={() => setShowCashierModal(true)} className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
-                  <Plus className="w-4 h-4" /> Add Cashier
-                </button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShowCashierReportList(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm">
+                    <FileText className="w-4 h-4" /> Cashier Report
+                  </button>
+                  <button onClick={() => setShowCashierModal(true)} className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
+                    <Plus className="w-4 h-4" /> Add Cashier
+                  </button>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
@@ -2417,6 +2434,128 @@ export default function AdminDashboard() {
               <div className="flex gap-3">
                 <button onClick={() => setShowDeleteConfirm(false)} className="flex-1 h-12 bg-gray-50 text-gray-400 font-bold rounded-xl hover:bg-gray-100">Cancel</button>
                 <button onClick={handleConfirmDelete} className="flex-1 h-12 bg-hcdc-red text-white font-bold rounded-xl hover:bg-[#A01E1F] shadow-lg shadow-hcdc-red/20">Delete</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Cashier Reports Modals */}
+      <AnimatePresence>
+        {showCashierReportList && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[90]">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2rem] w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+            >
+              <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h3 className="text-2xl font-black text-gray-800">Cashier Reports</h3>
+                  <p className="text-sm text-gray-500 font-medium mt-1">History of cashier shift logouts and cash counts.</p>
+                </div>
+                <button onClick={() => setShowCashierReportList(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors bg-white shadow-sm border border-gray-100">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="space-y-4">
+                  {cashCounts.map(count => (
+                    <div key={count.id} className="bg-white border-2 border-gray-100 p-5 rounded-2xl flex justify-between items-center hover:border-hcdc-blue/30 hover:shadow-md transition-all group">
+                      <div>
+                        <p className="font-black text-lg text-gray-800">{count.cashier}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                          <p className="text-sm text-gray-500 font-medium">{count.date} &nbsp;&bull;&nbsp; {count.time}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => setSelectedCashCount(count)}
+                        className="bg-hcdc-blue/10 text-hcdc-blue px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-hcdc-blue hover:text-white transition-colors"
+                      >
+                        Show Report
+                      </button>
+                    </div>
+                  ))}
+                  {cashCounts.length === 0 && (
+                    <div className="text-center py-20 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                      <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                      <p className="text-gray-500 font-black text-lg">No cashier reports found.</p>
+                      <p className="text-gray-400 text-sm mt-1">Reports will appear here once cashiers log out and submit their cash count.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {selectedCashCount && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden shadow-2xl flex flex-col"
+            >
+              <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div>
+                  <h3 className="text-xl font-black text-gray-800">Cash Count Report</h3>
+                  <p className="text-sm text-gray-500 font-bold mt-1 text-hcdc-blue">{selectedCashCount.cashier}</p>
+                </div>
+                <button onClick={() => setSelectedCashCount(null)} className="p-2 hover:bg-gray-200 rounded-full transition-colors bg-white shadow-sm border border-gray-100">
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date & Time</p>
+                    <p className="font-bold text-gray-800 text-sm">{selectedCashCount.date} - {selectedCashCount.time}</p>
+                  </div>
+                  <Clock className="w-5 h-5 text-gray-400" />
+                </div>
+                
+                <div className="bg-hcdc-blue/5 p-5 rounded-2xl border border-hcdc-blue/20 text-center">
+                  <p className="text-xs font-black text-hcdc-blue/70 uppercase tracking-widest mb-1">Declared Cash Total</p>
+                  <p className="text-3xl font-black text-hcdc-blue">₱ {selectedCashCount.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                </div>
+                
+                {selectedCashCount.totalORAmount !== undefined && (
+                  <div className="bg-green-50 p-5 rounded-2xl border border-green-200 text-center">
+                    <p className="text-xs font-black text-green-600/70 uppercase tracking-widest mb-1">Total System Sales (OR)</p>
+                    <p className="text-2xl font-black text-green-600">₱ {selectedCashCount.totalORAmount.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                    
+                    <div className="mt-3 pt-3 border-t border-green-200/50 flex justify-between items-center">
+                      <span className="text-xs font-bold text-green-700 uppercase tracking-wider">Variance</span>
+                      <span className={`text-sm font-black ${selectedCashCount.amount >= selectedCashCount.totalORAmount ? 'text-green-700' : 'text-red-500'}`}>
+                        {selectedCashCount.amount >= selectedCashCount.totalORAmount ? '+' : ''} ₱ {(selectedCashCount.amount - selectedCashCount.totalORAmount).toLocaleString(undefined, {minimumFractionDigits: 2})}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="bg-white border-2 border-gray-100 p-5 rounded-2xl">
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 pb-2 border-b border-gray-100 flex items-center gap-2">
+                    <DollarSign className="w-3.5 h-3.5" /> Denomination Breakdown
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    {Object.entries(selectedCashCount.denominations || {}).map(([denom, qty]) => (
+                      (qty as number) > 0 ? (
+                        <div key={denom} className="flex justify-between items-center py-1">
+                          <span className="font-bold text-gray-500">{denom === 'centavos' ? 'Centavos' : denom === 'coins' ? 'Coins' : `₱${denom}`}</span>
+                          <span className="font-black text-gray-800 bg-gray-50 px-2 py-0.5 rounded-md">
+                            {denom === 'centavos' || denom === 'coins' ? `₱${qty}` : `x${qty}`}
+                          </span>
+                        </div>
+                      ) : null
+                    ))}
+                    {!selectedCashCount.denominations || Object.values(selectedCashCount.denominations).every(v => !v) ? (
+                      <p className="col-span-2 text-center text-xs text-gray-400 py-2">No detailed denominations recorded.</p>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </motion.div>
           </div>

@@ -11,7 +11,7 @@ export interface CashCountDenominations {
   '10'?: number;
   '5'?: number;
   '1'?: number;
-  'coins'?: number;
+  'centavos'?: number;
 }
 
 export interface CashCountRecord {

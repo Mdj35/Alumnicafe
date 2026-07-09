@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { saveTransaction, updateCashierNames } from './transactions';
@@ -124,7 +125,7 @@ export default function App() {
     setShowCashCountModal(false);
     setTotalORAmount('');
     setCashDenominations({
-      '1000': 0, '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0, '5': 0, '1': 0, 'coins': 0
+      '1000': 0, '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0, '5': 0, '1': 0, 'centavos': 0
     });
   };
 
@@ -135,8 +136,10 @@ export default function App() {
   const [customerName, setCustomerName] = useState('');
   const [customerIdNumber, setCustomerIdNumber] = useState('');
   const [cashTendered, setCashTendered] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'OR'>('Cash');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online'>('Cash');
   const [orNumber, setOrNumber] = useState('');
+  const [onlineReference, setOnlineReference] = useState('');
+  const [receiptOption, setReceiptOption] = useState<'Without OR' | 'With OR'>('Without OR');
   const [time, setTime] = useState(new Date());
   const [txnNumber, setTxnNumber] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
@@ -153,12 +156,12 @@ export default function App() {
   const [showCashCountModal, setShowCashCountModal] = useState(false);
   const [totalORAmount, setTotalORAmount] = useState<string>('');
   const [cashDenominations, setCashDenominations] = useState<Record<string, number>>({
-    '1000': 0, '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0, '5': 0, '1': 0, 'coins': 0
+    '1000': 0, '500': 0, '200': 0, '100': 0, '50': 0, '20': 0, '10': 0, '5': 0, '1': 0, 'centavos': 0
   });
 
   const totalCashCount = useMemo(() => {
     return Object.entries(cashDenominations).reduce((sum, [den, qty]) => {
-      const val = den === 'coins' ? 1 : parseInt(den);
+      const val = den === 'centavos' ? 1 : parseInt(den);
       return sum + (val * (qty as number));
     }, 0);
   }, [cashDenominations]);
@@ -330,11 +333,11 @@ export default function App() {
     }
     const cash = parseFloat(cashTendered) || 0;
 
-    if (paymentMethod === 'Cash' && cash < total) {
+    if (cash < total) {
       alert('Insufficient cash tendered!');
       return;
     }
-    if (paymentMethod === 'OR' && !orNumber.trim()) {
+    if (receiptOption === 'With OR' && !orNumber.trim()) {
       alert('Please enter the OR number!');
       return;
     }
@@ -360,14 +363,14 @@ export default function App() {
       total,
       customerName: discountType !== 'REGULAR' ? customerName : undefined,
       customerIdNumber: discountType !== 'REGULAR' ? customerIdNumber : undefined,
-      cashTendered: paymentMethod === 'Cash' ? cash : total,
-      change: paymentMethod === 'Cash' ? Math.max(0, cash - total) : 0,
-      paymentMethod,
-      orNumber: paymentMethod === 'OR' ? orNumber.trim() : undefined,
+      cashTendered: cash,
+      change: Math.max(0, cash - total),
+      paymentMethod: 'Cash',
+      orNumber: receiptOption === 'With OR' ? orNumber.trim() : undefined,
     });
 
     // Deduct inventory
-    const itemsToDeduct = Object.entries(usedInventory).map(([itemId, quantity]) => ({ itemId, quantity }));
+    const itemsToDeduct = Object.entries(usedInventory).map(([itemId, quantity]) => ({ itemId, quantity: quantity as number }));
     if (itemsToDeduct.length > 0) {
       await deductInventoryUsage(itemsToDeduct);
       const updatedInv = await getInventoryItems();
@@ -809,56 +812,67 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="p-10 space-y-8">
-                <div className="flex bg-gray-100 p-1 rounded-2xl">
-                  <button
-                    onClick={() => setPaymentMethod('Cash')}
-                    className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${paymentMethod === 'Cash' ? 'bg-white shadow-sm text-hcdc-blue' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    Cash
-                  </button>
-                  <button
-                    onClick={() => setPaymentMethod('OR')}
-                    className={`flex-1 py-3 text-sm font-black rounded-xl transition-all ${paymentMethod === 'OR' ? 'bg-white shadow-sm text-hcdc-blue' : 'text-gray-400 hover:text-gray-600'}`}
-                  >
-                    Official Receipt (OR)
-                  </button>
+              <div className="p-10 space-y-6">
+                <div className="space-y-4">
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+                    <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
+                  </label>
+                  <div className="relative group">
+                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
+                    <input
+                      autoFocus
+                      type="number"
+                      placeholder="Enter amount"
+                      value={cashTendered}
+                      onChange={(e) => setCashTendered(e.target.value)}
+                      className="w-full h-20 pl-14 pr-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-4xl transition-all shadow-inner placeholder:text-hcdc-blue/10"
+                    />
+                  </div>
                 </div>
 
-                {paymentMethod === 'Cash' ? (
-                  <>
-                    <div className="space-y-4">
-                      <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
-                        <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
-                      </label>
-                      <div className="relative group">
-                        <div className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
-                        <input
-                          autoFocus
-                          type="number"
-                          placeholder="Enter amount"
-                          value={cashTendered}
-                          onChange={(e) => setCashTendered(e.target.value)}
-                          className="w-full h-20 pl-14 pr-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-4xl transition-all shadow-inner placeholder:text-hcdc-blue/10"
-                        />
-                      </div>
+                <div className="bg-gray-50 rounded-3xl p-6 flex justify-between items-center border border-gray-100">
+                  <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Change to return</p>
+                    <p className={`text-3xl font-black tracking-tighter tabular-nums ${change > 0 ? 'text-green-600' : 'text-gray-200'}`}>
+                      {formatCurrency(change)}
+                    </p>
+                  </div>
+                  {cash >= total && total > 0 && (
+                    <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" /> Paid
                     </div>
+                  )}
+                </div>
 
-                    <div className="bg-gray-50 rounded-3xl p-6 flex justify-between items-center border border-gray-100">
-                      <div>
-                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Change to return</p>
-                        <p className={`text-3xl font-black tracking-tighter tabular-nums ${change > 0 ? 'text-green-600' : 'text-gray-200'}`}>
-                          {formatCurrency(change)}
-                        </p>
-                      </div>
-                      {cash >= total && total > 0 && (
-                        <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                          <CheckCircle2 className="w-4 h-4" /> Paid
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
+                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 mt-6">
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 block mb-4 flex items-center gap-2">
+                    <Receipt className="w-4 h-4 text-hcdc-blue" /> Request Official Receipt?
+                  </label>
+                  <div className="flex gap-4">
+                    <label className={`flex-1 flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${receiptOption === 'With OR' ? 'border-hcdc-blue bg-white shadow-md' : 'border-gray-200 hover:bg-gray-100/50 hover:border-gray-300'}`}>
+                      <input 
+                        type="radio" 
+                        name="receipt" 
+                        className="w-5 h-5 accent-hcdc-blue" 
+                        checked={receiptOption === 'With OR'} 
+                        onChange={() => setReceiptOption('With OR')} 
+                      />
+                      <span className="font-bold text-gray-800">Yes</span>
+                    </label>
+                    <label className={`flex-1 flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${receiptOption === 'Without OR' ? 'border-hcdc-blue bg-white shadow-md' : 'border-gray-200 hover:bg-gray-100/50 hover:border-gray-300'}`}>
+                      <input 
+                        type="radio" 
+                        name="receipt" 
+                        className="w-5 h-5 accent-hcdc-blue" 
+                        checked={receiptOption === 'Without OR'} 
+                        onChange={() => setReceiptOption('Without OR')} 
+                      />
+                      <span className="font-bold text-gray-800">No</span>
+                    </label>
+                  </div>
+                </div>
+
+                {receiptOption === 'With OR' && (
                   <div className="space-y-4">
                     <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
                       <Receipt className="w-3 h-3 text-hcdc-blue" /> OR Number
@@ -869,26 +883,21 @@ export default function App() {
                       placeholder="e.g. 123456"
                       value={orNumber}
                       onChange={(e) => setOrNumber(e.target.value)}
-                      className="w-full h-20 px-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-2xl transition-all shadow-inner placeholder:text-hcdc-blue/30"
+                      className="w-full h-20 px-8 bg-gray-50 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-2xl transition-all shadow-inner placeholder:text-gray-300"
                     />
-                    {orNumber.trim() && (
-                      <div className="bg-green-100 text-green-700 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 justify-center mt-4">
-                        <CheckCircle2 className="w-4 h-4" /> Valid OR Payment
-                      </div>
-                    )}
                   </div>
                 )}
 
                 <div className="flex gap-4 mt-8">
                   <button
-                    onClick={() => { setShowPaymentModal(false); setCashTendered(''); setOrNumber(''); setPaymentMethod('Cash'); }}
+                    onClick={() => { setShowPaymentModal(false); setCashTendered(''); setOnlineReference(''); setOrNumber(''); setPaymentMethod('Cash'); setReceiptOption('Without OR'); }}
                     className="flex-1 h-16 bg-white border-2 border-gray-100 text-gray-400 font-black rounded-2xl hover:bg-gray-50 hover:text-gray-600 transition-all uppercase tracking-widest text-xs"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={processPayment}
-                    disabled={(paymentMethod === 'Cash' ? cash < total : !orNumber.trim()) || total <= 0}
+                    disabled={(cash < total) || (receiptOption === 'With OR' && !orNumber.trim()) || total <= 0}
                     className="flex-[2] h-16 bg-hcdc-red hover:bg-[#A01E1F] text-white font-black rounded-2xl shadow-xl shadow-hcdc-red/30 flex items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 disabled:shadow-none text-lg uppercase tracking-wide"
                   >
                     Confirm Payment
@@ -1031,17 +1040,18 @@ export default function App() {
               </div>
               <div className="p-8 space-y-4">
                 <div className="grid grid-cols-2 gap-3">
-                  {['1000', '500', '200', '100', '50', '20', '10', '5', '1', 'coins'].map(den => (
+                  {['1000', '500', '200', '100', '50', '20', '10', '5', '1', 'centavos'].map(den => (
                     <div key={den} className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-gray-100">
-                      <div className="w-12 text-right font-black text-gray-400 text-[10px] uppercase tracking-widest">
-                        {den === 'coins' ? 'Coins' : `₱${den}`}
+                      <div className="w-16 text-right font-black text-gray-400 text-[10px] uppercase tracking-widest">
+                        {den === 'centavos' ? 'Centavos' : `₱${den}`}
                       </div>
                       <input
                         type="number"
                         min="0"
+                        step={den === 'centavos' ? '0.01' : '1'}
                         value={cashDenominations[den] || ''}
-                        onChange={(e) => setCashDenominations({ ...cashDenominations, [den]: parseInt(e.target.value) || 0 })}
-                        className="flex-1 w-full h-10 px-2 bg-white border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold text-center text-sm transition-all focus:ring-0"
+                        onChange={(e) => setCashDenominations({ ...cashDenominations, [den]: parseFloat(e.target.value) || 0 })}
+                        className="flex-1 w-full h-10 px-2 bg-white border-2 border-transparent focus:border-hcdc-blue rounded-xl font-bold text-center text-sm transition-all focus:ring-0 always-show-spinners"
                         placeholder="0"
                       />
                     </div>
