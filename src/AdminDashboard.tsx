@@ -44,8 +44,8 @@ import {
 import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, MenuItem, getMenuCategories, addMenuCategory, deleteMenuCategory } from './menuStorage';
 import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
 import { getCashiers, addCashier, updateCashier, deleteCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
-import { getInventory, saveInventory, deleteInventoryItem, Inventory, getInventoryLogs, addInventoryLog, InventoryLog } from './inventoryStorage';
-
+import { getInventoryItems, InventoryItem } from './inventoryManager';
+import InventoryDashboard from './components/inventory/InventoryDashboard';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -97,8 +97,8 @@ export default function AdminDashboard() {
   const [reportCashierFilter, setReportCashierFilter] = useState('All');
 
   // Inventory state
-  const [inventory, setInventory] = useState<Inventory>([]);
-  const [inventoryLogs, setInventoryLogs] = useState<InventoryLog[]>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [inventoryLogs, setInventoryLogs] = useState<any[]>([]);
   const [inventoryLogPeriod, setInventoryLogPeriod] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'specific'>('all');
   const [inventorySpecificDate, setInventorySpecificDate] = useState('');
   const [addInventoryForm, setAddInventoryForm] = useState({ name: '', quantity: '', unit: 'g' });
@@ -129,13 +129,12 @@ export default function AdminDashboard() {
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      const [m, t, c, cat, i, l] = await Promise.all([
+      const [m, t, c, cat, i] = await Promise.all([
         getMenuItems(),
         getTransactions(),
         getCashiers(),
         getMenuCategories(),
-        getInventory(),
-        getInventoryLogs()
+        getInventoryItems()
       ]);
       if (isMounted) {
         setMenuItems(m);
@@ -143,7 +142,6 @@ export default function AdminDashboard() {
         setCashiers(c);
         setCategories(cat);
         setInventory(i);
-        setInventoryLogs(l);
       }
     };
     loadData();
@@ -1636,248 +1634,8 @@ export default function AdminDashboard() {
 
           {/* --- INVENTORY TAB --- */}
           {activeTab === 'inventory' && (
-            <div className="space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm gap-4">
-                <div>
-                  <h3 className="text-xl font-black text-gray-800">Inventory Stock</h3>
-                  <p className="text-xs text-gray-500 font-medium mt-1">Manage Master and Cafe inventories.</p>
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setAddInventoryLocation('master');
-                      setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
-                      setIsAddingNewStock(false);
-                      setShowAddInventoryModal(true);
-                    }}
-                    className="px-5 py-3 bg-hcdc-blue hover:bg-hcdc-blue-dark text-white font-black rounded-xl transition-all shadow-md flex items-center gap-2 text-xs uppercase tracking-wider"
-                  >
-                    <Plus className="w-4 h-4" /> Add Master Stock
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAddInventoryLocation('cafe');
-                      setAddInventoryForm({ name: '', quantity: '', unit: 'g' });
-                      setIsAddingNewStock(false);
-                      setShowAddInventoryModal(true);
-                    }}
-                    className="px-5 py-3 bg-hcdc-gold hover:bg-[#D4A017] text-white font-black rounded-xl transition-all shadow-md flex items-center gap-2 text-xs uppercase tracking-wider"
-                  >
-                    <Plus className="w-4 h-4" /> Add Cafe Stock
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Master Inventory */}
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-black text-gray-800">Master Inventory</h3>
-                    <span className="px-2.5 py-1 bg-hcdc-light-blue text-hcdc-blue rounded-lg text-xs font-bold uppercase tracking-wider">
-                      Central Warehouse
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {inventory.filter(item => item.location === 'master').length === 0 ? (
-                      <p className="text-sm text-gray-500 text-center py-8">No master stock items available.</p>
-                    ) : (
-                      inventory.filter(item => item.location === 'master').map(stock => (
-                        <div key={stock.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl group hover:bg-white hover:shadow-md border-2 border-transparent hover:border-gray-100 transition-all">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-gray-700 truncate">{stock.name}</p>
-                            <p className="text-xs text-gray-400 font-medium">{stock.unit === 'g' ? 'Grams' : stock.unit === 'ml' ? 'Millilitres' : 'Pieces'}</p>
-                          </div>
-                          <span className="text-xl font-black text-hcdc-blue tabular-nums shrink-0">
-                            {stock.quantity.toLocaleString()} {stock.unit}
-                          </span>
-                          <div className="flex gap-1.5 transition-opacity shrink-0">
-                            <button
-                              onClick={() => initiateInvAuth('edit', stock.id)}
-                              title="Edit ingredient"
-                              className="w-8 h-8 rounded-xl bg-hcdc-light-blue text-hcdc-blue flex items-center justify-center hover:bg-hcdc-blue hover:text-white transition-all"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => initiateInvAuth('delete', stock.id)}
-                              title="Delete ingredient"
-                              className="w-8 h-8 rounded-xl bg-red-50 text-hcdc-red flex items-center justify-center hover:bg-hcdc-red hover:text-white transition-all"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                {/* Cafe Inventory */}
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-                  <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-xl font-black text-gray-800">Cafe Inventory</h3>
-                    <span className="px-2.5 py-1 bg-amber-50 text-hcdc-gold rounded-lg text-xs font-bold uppercase tracking-wider">
-                      Cafe Outlet
-                    </span>
-                  </div>
-                  <div className="space-y-3">
-                    {inventory.filter(item => !item.location || item.location === 'cafe').length === 0 ? (
-                      <p className="text-sm text-gray-500 text-center py-8">No cafe stock items available.</p>
-                    ) : (
-                      inventory.filter(item => !item.location || item.location === 'cafe').map(stock => (
-                        <div key={stock.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl group hover:bg-white hover:shadow-md border-2 border-transparent hover:border-gray-100 transition-all">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-gray-700 truncate">{stock.name}</p>
-                            <p className="text-xs text-gray-400 font-medium">{stock.unit === 'g' ? 'Grams' : stock.unit === 'ml' ? 'Millilitres' : 'Pieces'}</p>
-                          </div>
-                          <span className="text-xl font-black text-hcdc-blue tabular-nums shrink-0">
-                            {stock.quantity.toLocaleString()} {stock.unit}
-                          </span>
-                          <div className="flex gap-1.5 transition-opacity shrink-0">
-                            <button
-                              onClick={() => initiateInvAuth('edit', stock.id)}
-                              title="Edit ingredient"
-                              className="w-8 h-8 rounded-xl bg-hcdc-light-blue text-hcdc-blue flex items-center justify-center hover:bg-hcdc-blue hover:text-white transition-all"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => initiateInvAuth('delete', stock.id)}
-                              title="Delete ingredient"
-                              className="w-8 h-8 rounded-xl bg-red-50 text-hcdc-red flex items-center justify-center hover:bg-hcdc-red hover:text-white transition-all"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-8 border-b border-gray-50">
-                  <h3 className="text-xl font-black text-gray-800">Available Servings Estimate</h3>
-                  <p className="text-xs text-gray-500 font-medium mt-1">Based on current stock and item recipes.</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black">
-                        <th className="p-6">Item</th>
-                        <th className="p-6">Required Ingredients</th>
-                        <th className="p-6 text-right">Available Servings</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {menuItems.filter(item => item.ingredients && item.ingredients.length > 0).map(item => {
-                        let minServings = Infinity;
-
-                        item.ingredients?.forEach(ing => {
-                          const stockItem = inventory.find(i => i.id === ing.inventoryId);
-                          const stockQty = stockItem ? stockItem.quantity : 0;
-                          const servings = Math.floor(stockQty / ing.quantity);
-                          if (servings < minServings) minServings = servings;
-                        });
-
-                        const isLow = minServings < 10;
-                        const isOut = minServings === 0;
-
-                        return (
-                          <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="p-6 font-bold text-gray-800">{item.name}</td>
-                            <td className="p-6 font-mono text-sm text-gray-500">
-                              {item.ingredients?.map((ing, i) => {
-                                const stockItem = inventory.find(stock => stock.id === ing.inventoryId);
-                                return (
-                                  <div key={i}>{stockItem ? stockItem.name : 'Unknown'}: {ing.quantity}{stockItem?.unit}</div>
-                                );
-                              })}
-                            </td>
-                            <td className="p-6 text-right">
-                              <span className={`px-3 py-1.5 rounded-lg text-sm font-black ${isOut ? 'bg-red-100 text-red-700' : isLow ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
-                                {isFinite(minServings) ? minServings : '-'}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {menuItems.filter(item => item.ingredients && item.ingredients.length > 0).length === 0 && (
-                        <tr>
-                          <td colSpan={3} className="p-6 text-center text-gray-400 font-medium">No items with defined ingredients.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mt-8">
-                <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-                  <div>
-                    <h3 className="text-xl font-black text-gray-800">Inventory Logs</h3>
-                    <p className="text-xs text-gray-500 font-medium mt-1">History of added stock.</p>
-                  </div>
-                  <div className="flex gap-3">
-                    <select
-                      value={inventoryLogPeriod}
-                      onChange={(e) => setInventoryLogPeriod(e.target.value as any)}
-                      className="bg-white border-2 border-gray-100 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
-                    >
-                      <option value="all">All Time</option>
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="specific">Specific Date</option>
-                    </select>
-                    {inventoryLogPeriod === 'specific' && (
-                      <input
-                        type="date"
-                        value={inventorySpecificDate}
-                        onChange={(e) => setInventorySpecificDate(e.target.value)}
-                        className="bg-white border-2 border-gray-100 text-gray-700 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none"
-                      />
-                    )}
-                    <button
-                      onClick={exportInventoryCSV}
-                      disabled={filteredInventoryLogs.length === 0}
-                      className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Download className="w-4 h-4" /> Export CSV
-                    </button>
-                  </div>
-                </div>
-                <div className="overflow-x-auto max-h-[400px]">
-                  <table className="w-full text-left">
-                    <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black z-10 shadow-sm">
-                      <tr>
-                        <th className="p-6">Date</th>
-                        <th className="p-6">Time</th>
-                        <th className="p-6">Stock Added</th>
-                        <th className="p-6">Quantity Added</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50">
-                      {[...filteredInventoryLogs].sort((a, b) => b.id - a.id).map(log => {
-                        return (
-                          <tr key={log.id} className="hover:bg-gray-50/50 transition-colors">
-                            <td className="p-6 font-bold text-gray-800">{log.date.split('T')[0]}</td>
-                            <td className="p-6 font-mono text-sm text-gray-500">{log.time}</td>
-                            <td className="p-6 font-bold text-gray-800">{log.stockName}</td>
-                            <td className="p-6 font-mono text-sm text-green-600 font-bold">+{log.addedQuantity} {log.unit}</td>
-                          </tr>
-                        );
-                      })}
-                      {filteredInventoryLogs.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="p-6 text-center text-gray-400 font-medium">No inventory logs found for the selected period.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+            <div className="h-full">
+              <InventoryDashboard />
             </div>
           )}
 
@@ -2209,8 +1967,7 @@ export default function AdminDashboard() {
                     <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block">Required Ingredients</label>
                     <button
                       onClick={() => {
-                        const cafeInv = inventory.filter(stock => !stock.location || stock.location === 'cafe');
-                        setFormData({ ...formData, ingredients: [...formData.ingredients, { inventoryId: cafeInv[0]?.id || '', quantity: 0 }] });
+                        setFormData({ ...formData, ingredients: [...formData.ingredients, { inventoryId: inventory[0]?.id || '', quantity: 0 }] });
                       }}
                       className="text-xs font-bold text-hcdc-blue hover:underline flex items-center gap-1"
                     >
@@ -2229,8 +1986,8 @@ export default function AdminDashboard() {
                         className="flex-1 bg-white h-10 px-3 rounded-xl border border-gray-100 font-bold text-sm focus:outline-none focus:ring-2 focus:ring-hcdc-blue/20"
                       >
                         <option value="" disabled>Select Stock</option>
-                        {inventory.filter(stock => !stock.location || stock.location === 'cafe').map(stock => (
-                          <option key={stock.id} value={stock.id}>{stock.name} ({stock.unit})</option>
+                        {inventory.map(stock => (
+                          <option key={stock.id} value={stock.id}>{stock.item_name} ({stock.unit})</option>
                         ))}
                       </select>
                       <input

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { saveTransaction, updateCashierNames } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
-import { getInventory, saveInventory, Inventory } from './inventoryStorage';
+import { getInventoryItems, InventoryItem, deductInventoryUsage } from './inventoryManager';
 import { saveCashCount, getCashCounts, CashCountRecord } from './cashCountStorage';
 import {
   Coffee,
@@ -146,7 +146,7 @@ export default function App() {
   const [animations, setAnimations] = useState<{ id: number; key: number }[]>([]);
   const [products, setProducts] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
-  const [inventory, setInventory] = useState<Inventory>([]);
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
 
   const [newProduct, setNewProduct] = useState({ name: '', price: 0, category: 'Coffee', icon: '☕' });
 
@@ -178,7 +178,7 @@ export default function App() {
       const [p, c, i] = await Promise.all([
         getMenuItems(),
         getMenuCategories(),
-        getInventory()
+        getInventoryItems()
       ]);
       if (isMounted) {
         setProducts(p);
@@ -270,7 +270,7 @@ export default function App() {
       const required = ing.quantity * deltaQty;
       const alreadyUsed = usedInventory[ing.inventoryId] || 0;
       const stockItem = inventory.find(i => i.id === ing.inventoryId);
-      const stockQty = stockItem ? stockItem.quantity : 0;
+      const stockQty = stockItem ? stockItem.current_stock : 0;
       if (alreadyUsed + required > stockQty) return false;
     }
     return true;
@@ -367,12 +367,12 @@ export default function App() {
     });
 
     // Deduct inventory
-    const newInventory = inventory.map(stock => {
-      const used = usedInventory[stock.id] || 0;
-      return { ...stock, quantity: Math.max(0, stock.quantity - used) };
-    });
-    await saveInventory(newInventory);
-    setInventory(newInventory);
+    const itemsToDeduct = Object.entries(usedInventory).map(([itemId, quantity]) => ({ itemId, quantity }));
+    if (itemsToDeduct.length > 0) {
+      await deductInventoryUsage(itemsToDeduct);
+      const updatedInv = await getInventoryItems();
+      setInventory(updatedInv);
+    }
 
     setShowReceipt(true);
     setShowPaymentModal(false);
@@ -541,7 +541,7 @@ export default function App() {
                   hasInventoryTracking = true;
                   product.ingredients.forEach(ing => {
                     const stockItem = inventory.find(i => i.id === ing.inventoryId);
-                    const stockQty = stockItem ? stockItem.quantity : 0;
+                    const stockQty = stockItem ? stockItem.current_stock : 0;
                     const used = usedInventory[ing.inventoryId] || 0;
                     const avail = Math.max(0, stockQty - used);
                     const servings = Math.floor(avail / ing.quantity);
