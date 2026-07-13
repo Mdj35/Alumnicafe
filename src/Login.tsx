@@ -1,14 +1,35 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'motion/react';
-import { getCashiers, recordCashierLogin } from './cashierStorage';
+import { motion, AnimatePresence } from 'motion/react';
+import { getCashiers, recordCashierLogin, updateCashier, CashierAccount } from './cashierStorage';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
+  // Password change state
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [cashierToUpdate, setCashierToUpdate] = useState<CashierAccount | null>(null);
+  const [changePasswordError, setChangePasswordError] = useState('');
+
   const navigate = useNavigate();
+
+  const handleLoginSuccess = async (cashier: CashierAccount) => {
+    localStorage.setItem('cashier_auth', 'true');
+    localStorage.setItem('cashier_name', cashier.name);
+    localStorage.setItem('cashier_id', cashier.id.toString());
+    localStorage.setItem('cashier_role', cashier.role);
+    await recordCashierLogin(cashier.id);
+    
+    if (cashier.role === 'Admin') {
+      navigate('/admin');
+    } else {
+      navigate('/');
+    }
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,19 +45,46 @@ export default function Login() {
     );
 
     if (cashier && cashier.isActive !== false && isPasswordValid) {
-      localStorage.setItem('cashier_auth', 'true');
-      localStorage.setItem('cashier_name', cashier.name);
-      localStorage.setItem('cashier_id', cashier.id.toString());
-      localStorage.setItem('cashier_role', cashier.role);
-      await recordCashierLogin(cashier.id);
-      
-      if (cashier.role === 'Admin') {
-        navigate('/admin');
-      } else {
-        navigate('/');
+      if (password === '12345' || cashier.password === '12345') {
+        setCashierToUpdate(cashier);
+        setShowChangePassword(true);
+        return;
       }
+      
+      await handleLoginSuccess(cashier);
     } else {
       setError('Invalid username or password, or account is deactivated');
+    }
+  };
+
+  const handleChangePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError('');
+
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 5) {
+      setChangePasswordError('Password must be at least 5 characters long');
+      return;
+    }
+
+    if (newPassword === '12345') {
+      setChangePasswordError('Please choose a password different from the default');
+      return;
+    }
+
+    if (cashierToUpdate) {
+      try {
+        await updateCashier(cashierToUpdate.id, { password: newPassword });
+        const updatedCashier = { ...cashierToUpdate, password: newPassword };
+        setShowChangePassword(false);
+        await handleLoginSuccess(updatedCashier);
+      } catch (err) {
+        setChangePasswordError('Failed to update password. Please try again.');
+      }
     }
   };
 
@@ -108,6 +156,95 @@ export default function Login() {
           <p className="text-[9px] text-gray-400 mt-1 italic">"Blaze your Trail to Success"</p>
         </div>
       </motion.div>
+      <AnimatePresence>
+        {showChangePassword && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm"
+              onClick={() => {
+                // Prevent closing on backdrop click to enforce password change
+                // Provide a Cancel button to abort login
+              }}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-[2rem] shadow-2xl p-8 relative z-10 w-full max-w-md border border-gray-100"
+            >
+              <div className="text-center mb-8">
+                <div className="w-16 h-16 bg-hcdc-red/10 text-hcdc-red rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
+                  🔒
+                </div>
+                <h2 className="font-heading font-black text-2xl text-gray-800">Change Password</h2>
+                <p className="text-xs font-bold text-gray-400 mt-2">
+                  You are using the default password. Please secure your account.
+                </p>
+              </div>
+
+              <form onSubmit={handleChangePasswordSubmit} className="space-y-4">
+                {changePasswordError && (
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="bg-hcdc-light-red text-hcdc-red text-xs font-bold px-4 py-3 rounded-xl text-center"
+                  >
+                    {changePasswordError}
+                  </motion.div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">New Password</label>
+                  <input 
+                    type="password" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-hcdc-blue focus:bg-white outline-none transition-all font-medium text-sm"
+                    placeholder="Enter new password"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Confirm Password</label>
+                  <input 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-hcdc-blue focus:bg-white outline-none transition-all font-medium text-sm"
+                    placeholder="Confirm new password"
+                    required
+                  />
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      setShowChangePassword(false);
+                      setCashierToUpdate(null);
+                      setNewPassword('');
+                      setConfirmPassword('');
+                    }}
+                    className="flex-1 py-4 bg-gray-100 hover:bg-gray-200 text-gray-600 font-black rounded-2xl transition-all active:scale-95 uppercase tracking-wider text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-4 bg-hcdc-blue hover:bg-hcdc-blue-dark text-white font-black rounded-2xl shadow-xl shadow-hcdc-blue/20 transition-all hover:-translate-y-1 active:scale-95 uppercase tracking-wider text-sm"
+                  >
+                    Update
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
