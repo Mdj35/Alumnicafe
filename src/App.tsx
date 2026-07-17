@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { saveTransaction, updateCashierNames } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
-import { getInventoryItems, InventoryItem, deductInventoryUsage } from './inventoryManager';
+import { getInventoryItems, InventoryItem, deductIngredientsByRecipe, getRecipes, Recipe } from './inventoryManager';
 import { saveCashCount, getCashCounts, CashCountRecord } from './cashCountStorage';
 import {
   Coffee,
@@ -150,6 +150,7 @@ export default function App() {
   const [products, setProducts] = useState<MenuItem[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
 
   const [newProduct, setNewProduct] = useState({ name: '', price: 0, category: 'Coffee', icon: '☕' });
 
@@ -178,15 +179,17 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      const [p, c, i] = await Promise.all([
+      const [p, c, i, r] = await Promise.all([
         getMenuItems(),
         getMenuCategories(),
-        getInventoryItems()
+        getInventoryItems(),
+        getRecipes()
       ]);
       if (isMounted) {
         setProducts(p);
         setCategories(c);
         setInventory(i);
+        setRecipes(r);
       }
     };
     loadData();
@@ -258,21 +261,24 @@ export default function App() {
   const usedInventory = useMemo(() => {
     const usage: Record<string, number> = {};
     cart.forEach(item => {
-      if (item.ingredients) {
-        item.ingredients.forEach(ing => {
-          usage[ing.inventoryId] = (usage[ing.inventoryId] || 0) + (ing.quantity * item.quantity);
+      const recipe = recipes.find(r => r.menu_item_id === item.id);
+      if (recipe && recipe.ingredients) {
+        recipe.ingredients.forEach(ing => {
+          usage[ing.item_id] = (usage[ing.item_id] || 0) + (ing.quantity * item.quantity);
         });
       }
     });
     return usage;
-  }, [cart]);
+  }, [cart, recipes]);
 
   const canAddProduct = (product: Product, deltaQty: number) => {
-    if (!product.ingredients) return true;
-    for (const ing of product.ingredients) {
+    const recipe = recipes.find(r => r.menu_item_id === product.id);
+    if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) return true;
+    
+    for (const ing of recipe.ingredients) {
       const required = ing.quantity * deltaQty;
-      const alreadyUsed = usedInventory[ing.inventoryId] || 0;
-      const stockItem = inventory.find(i => i.id === ing.inventoryId);
+      const alreadyUsed = usedInventory[ing.item_id] || 0;
+      const stockItem = inventory.find(i => i.id === ing.item_id);
       const stockQty = stockItem ? stockItem.current_stock : 0;
       if (alreadyUsed + required > stockQty) return false;
     }
@@ -370,9 +376,8 @@ export default function App() {
     });
 
     // Deduct inventory
-    const itemsToDeduct = Object.entries(usedInventory).map(([itemId, quantity]) => ({ itemId, quantity: quantity as number }));
-    if (itemsToDeduct.length > 0) {
-      await deductInventoryUsage(itemsToDeduct);
+    if (cart.length > 0) {
+      await deductIngredientsByRecipe(cart.map(c => ({ id: c.id, quantity: c.quantity })), txnNumber);
       const updatedInv = await getInventoryItems();
       setInventory(updatedInv);
     }
@@ -540,12 +545,14 @@ export default function App() {
                 let minServings = Infinity;
                 let hasInventoryTracking = false;
 
-                if (product.ingredients && product.ingredients.length > 0) {
+                const recipe = recipes.find(r => r.menu_item_id === product.id);
+
+                if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
                   hasInventoryTracking = true;
-                  product.ingredients.forEach(ing => {
-                    const stockItem = inventory.find(i => i.id === ing.inventoryId);
+                  recipe.ingredients.forEach(ing => {
+                    const stockItem = inventory.find(i => i.id === ing.item_id);
                     const stockQty = stockItem ? stockItem.current_stock : 0;
-                    const used = usedInventory[ing.inventoryId] || 0;
+                    const used = usedInventory[ing.item_id] || 0;
                     const avail = Math.max(0, stockQty - used);
                     const servings = Math.floor(avail / ing.quantity);
                     if (servings < minServings) minServings = servings;

@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc, getDoc, query, orderBy, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 
 // Collections
@@ -8,6 +8,8 @@ const PURCHASES_COL = 'inventory_purchases';
 const COUNTS_COL = 'inventory_stock_counts';
 const TXNS_COL = 'inventory_transactions';
 const PERIODS_COL = 'inventory_periods';
+const RECIPES_COL = 'inventory_recipes';
+const OPENING_STOCK_COL = 'inventory_opening_stock';
 
 // --- Types ---
 export interface InventoryCategory {
@@ -17,26 +19,35 @@ export interface InventoryCategory {
 
 export interface InventoryItem {
   id: string;
+  item_code: string;
   item_name: string;
-  category_id: string; // references InventoryCategory.id
+  category_id: string;
   unit: string;
-  cost_price: number;
+  supplier?: string;
+  purchase_price: number;
+  package_quantity: number;
+  unit_cost: number;
+  cost_price: number; // alias for unit_cost for legacy compatibility
   selling_price: number;
   opening_stock: number;
   current_stock: number;
-  minimum_stock: number;
+  minimum_stock: number; // reorder_level
+  weighted_avg_cost: number;
   created_at: string;
-  supplier?: string;
 }
 
 export interface Purchase {
   id: string;
+  item_id: string;
   supplier: string;
   purchase_date: string;
-  item_id: string;
-  quantity: number;
+  purchase_qty: number;
+  package_quantity: number;
+  quantity: number; // total units added to stock = purchase_qty * package_quantity
+  purchase_price: number;
   unit_cost: number;
   total_cost: number;
+  note?: string;
 }
 
 export interface StockCount {
@@ -55,6 +66,7 @@ export interface InventoryTransaction {
   quantity: number;
   amount: number;
   date: string;
+  sale_id?: string;
 }
 
 export interface InventoryPeriodItem {
@@ -74,6 +86,41 @@ export interface InventoryPeriod {
   items: InventoryPeriodItem[];
 }
 
+export interface RecipeIngredient {
+  item_id: string;
+  item_name: string;
+  quantity: number;
+  unit: string;
+  unit_cost: number; // snapshot cost
+}
+
+export interface Recipe {
+  id: string; // same as menu_item_id or unique
+  menu_item_id: number;
+  menu_item_name: string;
+  selling_price: number;
+  ingredients: RecipeIngredient[];
+  recipe_cost: number;
+  cost_per_serving: number;
+  food_cost_percentage: number;
+  gross_profit: number;
+}
+
+export interface OpeningStockItem {
+  item_id: string;
+  qty: number;
+  unit_cost: number;
+  value: number;
+}
+
+export interface OpeningStockEntry {
+  id: string;
+  date: string;
+  items: OpeningStockItem[];
+  total_value: number;
+  notes?: string;
+}
+
 // --- CATEGORIES ---
 export async function getInventoryCategories(): Promise<InventoryCategory[]> {
   try {
@@ -90,11 +137,6 @@ export async function getInventoryCategories(): Promise<InventoryCategory[]> {
 export async function addInventoryCategory(name: string): Promise<InventoryCategory[]> {
   const id = `cat_${Date.now()}`;
   await setDoc(doc(db, CATEGORIES_COL, id), { id, category_name: name });
-  return await getInventoryCategories();
-}
-
-export async function updateInventoryCategory(id: string, name: string): Promise<InventoryCategory[]> {
-  await updateDoc(doc(db, CATEGORIES_COL, id), { category_name: name });
   return await getInventoryCategories();
 }
 
@@ -139,7 +181,7 @@ export async function addInventoryItem(item: Omit<InventoryItem, 'id' | 'created
       item_id: id,
       transaction_type: 'Opening',
       quantity: item.opening_stock,
-      amount: item.opening_stock * item.cost_price,
+      amount: item.opening_stock * item.unit_cost,
       date: now
     });
   }
@@ -170,27 +212,58 @@ export async function getPurchases(): Promise<Purchase[]> {
   }
 }
 
-export async function logPurchase(purchase: Omit<Purchase, 'id'>): Promise<void> {
+export async function logPurchase(purchase: Omit<Purchase, 'id' | 'quantity' | 'unit_cost' | 'total_cost'>): Promise<void> {
   const id = `purch_${Date.now()}`;
-  const newPurchase = { ...purchase, id };
-  await setDoc(doc(db, PURCHASES_COL, id), newPurchase);
   
+  const unit_cost = purchase.purchase_price / purchase.package_quantity;
+  const quantity = purchase.purchase_qty * purchase.package_quantity;
+  const total_cost = purchase.purchase_qty * purchase.purchase_price;
+
+  const newPurchase: Purchase = { 
+    ...purchase, 
+    id,
+    quantity,
+    unit_cost,
+    total_cost
+  };
+
   const item = await getInventoryItem(purchase.item_id);
+  
+  const batch = writeBatch(db);
+  batch.set(doc(db, PURCHASES_COL, id), newPurchase);
+
   if (item) {
-    const newStock = item.current_stock + purchase.quantity;
-    await updateDoc(doc(db, ITEMS_COL, purchase.item_id), { 
+    const old_stock = item.current_stock;
+    const old_unit_cost = item.weighted_avg_cost || item.unit_cost;
+    const newStock = old_stock + quantity;
+    
+    // Calculate new weighted average cost
+    let new_weighted_avg = 0;
+    if (newStock > 0) {
+      new_weighted_avg = ((old_stock * old_unit_cost) + (quantity * unit_cost)) / newStock;
+    }
+    
+    batch.update(doc(db, ITEMS_COL, purchase.item_id), { 
       current_stock: newStock,
-      cost_price: purchase.unit_cost // Update cost price to latest purchase
+      purchase_price: purchase.purchase_price,
+      package_quantity: purchase.package_quantity,
+      unit_cost: unit_cost,
+      cost_price: unit_cost, // update legacy cost_price
+      weighted_avg_cost: new_weighted_avg
     });
     
-    await logInventoryTransaction({
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    batch.set(doc(db, TXNS_COL, txnId), {
+      id: txnId,
       item_id: purchase.item_id,
       transaction_type: 'Purchase',
-      quantity: purchase.quantity,
-      amount: purchase.total_cost,
+      quantity: quantity,
+      amount: total_cost,
       date: purchase.purchase_date
     });
   }
+
+  await batch.commit();
 }
 
 // --- TRANSACTIONS ---
@@ -211,27 +284,100 @@ export async function logInventoryTransaction(txn: Omit<InventoryTransaction, 'i
   await setDoc(doc(db, TXNS_COL, id), { ...txn, id });
 }
 
-// POS USE ONLY - DEDUCT STOCK
+// POS USE ONLY - DEDUCT STOCK VIA RECIPE
 export async function deductInventoryUsage(itemsUsed: { itemId: string, quantity: number }[]): Promise<void> {
+  // Kept for backward compatibility if any legacy component uses it.
   const now = new Date().toISOString();
+  const batch = writeBatch(db);
+
   for (const usage of itemsUsed) {
     const item = await getInventoryItem(usage.itemId);
     if (item) {
       const newStock = Math.max(0, item.current_stock - usage.quantity);
-      await updateDoc(doc(db, ITEMS_COL, usage.itemId), {
+      batch.update(doc(db, ITEMS_COL, usage.itemId), {
         current_stock: newStock
       });
       
-      await logInventoryTransaction({
+      const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      batch.set(doc(db, TXNS_COL, txnId), {
+        id: txnId,
         item_id: usage.itemId,
         transaction_type: 'Used',
         quantity: usage.quantity,
-        amount: usage.quantity * item.cost_price,
+        amount: usage.quantity * item.unit_cost,
         date: now
       });
     }
   }
+
+  await batch.commit();
 }
+
+export async function deductIngredientsByRecipe(cartItems: { id: number, quantity: number }[], saleId: string): Promise<void> {
+  const now = new Date().toISOString();
+  const batch = writeBatch(db);
+  const recipes = await getRecipes();
+  
+  // Consolidate ingredient usage
+  const usage: Record<string, number> = {};
+
+  for (const cartItem of cartItems) {
+    const recipe = recipes.find(r => r.menu_item_id === cartItem.id);
+    if (recipe && recipe.ingredients) {
+      for (const ing of recipe.ingredients) {
+        usage[ing.item_id] = (usage[ing.item_id] || 0) + (ing.quantity * cartItem.quantity);
+      }
+    }
+  }
+
+  const inventoryItems = await getInventoryItems();
+
+  for (const [itemId, qty] of Object.entries(usage)) {
+    const item = inventoryItems.find(i => i.id === itemId);
+    if (item) {
+      const newStock = item.current_stock - qty; // allow negative if they sold more than recorded stock
+      batch.update(doc(db, ITEMS_COL, itemId), {
+        current_stock: newStock
+      });
+
+      const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      batch.set(doc(db, TXNS_COL, txnId), {
+        id: txnId,
+        item_id: itemId,
+        transaction_type: 'Used',
+        quantity: qty,
+        amount: qty * item.unit_cost,
+        date: now,
+        sale_id: saleId
+      });
+    }
+  }
+
+  await batch.commit();
+}
+
+// --- RECIPES ---
+export async function getRecipes(): Promise<Recipe[]> {
+  try {
+    const querySnapshot = await getDocs(collection(db, RECIPES_COL));
+    const recipes: Recipe[] = [];
+    querySnapshot.forEach((d) => recipes.push(d.data() as Recipe));
+    return recipes;
+  } catch (error) {
+    console.error("Error fetching recipes:", error);
+    return [];
+  }
+}
+
+export async function saveRecipe(recipe: Omit<Recipe, 'id'> | Recipe): Promise<void> {
+  const id = 'id' in recipe && recipe.id ? recipe.id : `recipe_${recipe.menu_item_id}`;
+  await setDoc(doc(db, RECIPES_COL, id), { ...recipe, id });
+}
+
+export async function deleteRecipe(id: string): Promise<void> {
+  await deleteDoc(doc(db, RECIPES_COL, id));
+}
+
 
 // --- STOCK COUNTS ---
 export async function getStockCounts(): Promise<StockCount[]> {
@@ -248,27 +394,73 @@ export async function getStockCounts(): Promise<StockCount[]> {
 
 export async function recordStockCount(count: Omit<StockCount, 'id'>): Promise<void> {
   const id = `count_${Date.now()}`;
-  await setDoc(doc(db, COUNTS_COL, id), { ...count, id });
+  
+  const batch = writeBatch(db);
+  batch.set(doc(db, COUNTS_COL, id), { ...count, id });
   
   if (count.variance !== 0) {
     const item = await getInventoryItem(count.item_id);
     if (item) {
-      await updateDoc(doc(db, ITEMS_COL, count.item_id), {
+      batch.update(doc(db, ITEMS_COL, count.item_id), {
         current_stock: count.actual_quantity
       });
       
-      await logInventoryTransaction({
+      const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      batch.set(doc(db, TXNS_COL, txnId), {
+        id: txnId,
         item_id: count.item_id,
         transaction_type: 'Adjustment',
         quantity: count.variance, // positive if gained, negative if lost
-        amount: count.variance * item.cost_price,
+        amount: count.variance * item.unit_cost,
         date: count.count_date
       });
     }
   }
+
+  await batch.commit();
 }
 
-// --- INVENTORY PERIODS ---
+
+// --- OPENING STOCK ---
+export async function getOpeningStocks(): Promise<OpeningStockEntry[]> {
+  try {
+    const querySnapshot = await getDocs(query(collection(db, OPENING_STOCK_COL), orderBy('date', 'desc')));
+    const entries: OpeningStockEntry[] = [];
+    querySnapshot.forEach((d) => entries.push(d.data() as OpeningStockEntry));
+    return entries;
+  } catch (error) {
+    console.error("Error fetching opening stocks:", error);
+    return [];
+  }
+}
+
+export async function saveOpeningStock(entry: Omit<OpeningStockEntry, 'id'>): Promise<void> {
+  const id = `opening_${Date.now()}`;
+  
+  const batch = writeBatch(db);
+  batch.set(doc(db, OPENING_STOCK_COL, id), { ...entry, id });
+
+  for (const item of entry.items) {
+    batch.update(doc(db, ITEMS_COL, item.item_id), {
+      opening_stock: item.qty,
+      current_stock: item.qty // reset current stock
+    });
+    
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    batch.set(doc(db, TXNS_COL, txnId), {
+      id: txnId,
+      item_id: item.item_id,
+      transaction_type: 'Opening',
+      quantity: item.qty,
+      amount: item.value,
+      date: entry.date
+    });
+  }
+
+  await batch.commit();
+}
+
+// --- INVENTORY PERIODS (Legacy compat) ---
 export async function getInventoryPeriods(): Promise<InventoryPeriod[]> {
   try {
     const querySnapshot = await getDocs(query(collection(db, PERIODS_COL), orderBy('end_date', 'desc')));
@@ -285,21 +477,16 @@ export async function updateInventoryPeriod(id: string, items: InventoryPeriodIt
   await updateDoc(doc(db, PERIODS_COL, id), { items });
 }
 
-// Reset opening stock (beginning of period)
 export async function resetOpeningStock(): Promise<void> {
   const items = await getInventoryItems();
   const now = new Date().toISOString();
   
-  // 1. Save the current period snapshot
   const periods = await getInventoryPeriods();
   let start_date = now;
   if (periods.length > 0) {
-    start_date = periods[0].end_date; // starts when the last one ended
+    start_date = periods[0].end_date;
   } else {
-    // If it's the very first time, we don't have a strict start date, let's just make it a month ago or the earliest transaction date
-    // For simplicity, we just use the current time minus 30 days or similar, but let's just use now if we can't find one
-    // Actually, we can check the earliest transaction if we want, but for now we'll just say it started at a dummy date or simply "Initial"
-    start_date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(); // roughly a month ago
+    start_date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   }
 
   const periodItems: InventoryPeriodItem[] = items.map(item => ({
@@ -307,31 +494,36 @@ export async function resetOpeningStock(): Promise<void> {
     item_name: item.item_name,
     category_id: item.category_id,
     unit: item.unit,
-    cost_price: item.cost_price,
+    cost_price: item.unit_cost,
     opening_stock: item.opening_stock,
     closing_stock: item.current_stock
   }));
 
   const periodId = `period_${Date.now()}`;
-  await setDoc(doc(db, PERIODS_COL, periodId), {
+  
+  const batch = writeBatch(db);
+  batch.set(doc(db, PERIODS_COL, periodId), {
     id: periodId,
     start_date,
     end_date: now,
     items: periodItems
   });
   
-  // 2. Reset the actual items
   for (const item of items) {
-    await updateDoc(doc(db, ITEMS_COL, item.id), {
+    batch.update(doc(db, ITEMS_COL, item.id), {
       opening_stock: item.current_stock
     });
     
-    await logInventoryTransaction({
-        item_id: item.id,
-        transaction_type: 'Opening',
-        quantity: item.current_stock,
-        amount: item.current_stock * item.cost_price,
-        date: now
+    const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+    batch.set(doc(db, TXNS_COL, txnId), {
+      id: txnId,
+      item_id: item.id,
+      transaction_type: 'Opening',
+      quantity: item.current_stock,
+      amount: item.current_stock * item.unit_cost,
+      date: now
     });
   }
+
+  await batch.commit();
 }
