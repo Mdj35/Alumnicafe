@@ -82,3 +82,102 @@
 .always-show-spinners::-webkit-outer-spin-button {
   opacity: 1 !important;
 }
+
+/* =====================================================
+   GLOBAL LOADING SYSTEM — Animations & Utilities
+   ===================================================== */
+
+/* Shimmer sweep for skeleton loaders */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* Spinner rotation */
+@keyframes spin-cw {
+  to { transform: rotate(360deg); }
+}
+
+/* Fade in for overlay */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Fade out for overlay */
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* Skeleton base */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #e2e8f0 25%,
+    #f1f5f9 50%,
+    #e2e8f0 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+/* Spinner element */
+.loading-spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin-cw 0.7s linear infinite;
+  display: inline-block;
+}
+
+/* Fullscreen overlay */
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.loading-overlay.exit {
+  animation: fadeOut 0.2s ease forwards;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+    background: #e2e8f0;
+  }
+  .loading-spinner {
+    animation: none;
+    border-color: currentColor;
+    opacity: 0.5;
+  }
+  .loading-overlay {
+    animation: none;
+  }
+}
+
+/* Dark mode skeleton */
+@media (prefers-color-scheme: dark) {
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      #374151 25%,
+      #4b5563 50%,
+      #374151 75%
+    );
+    background-size: 200% 100%;
+  }
+}
+

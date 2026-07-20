@@ -6,6 +6,9 @@ import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories 
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
 import { getInventoryItems, InventoryItem, deductIngredientsByRecipe, getRecipes, Recipe } from './inventoryManager';
 import { saveCashCount, getCashCounts, CashCountRecord } from './cashCountStorage';
+import { useLoading } from './context/LoadingContext';
+import ButtonLoader from './components/ui/ButtonLoader';
+import SkeletonCard from './components/ui/SkeletonCard';
 import {
   Coffee,
   ChevronRight,
@@ -26,7 +29,8 @@ import {
   ChevronDown,
   ChevronUp,
   LayoutDashboard,
-  UtensilsCrossed
+  UtensilsCrossed,
+  Menu
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -54,6 +58,12 @@ const VAT_RATE = 0.12;
 
 export default function App() {
   const navigate = useNavigate();
+  const { startLoading, stopLoading } = useLoading();
+  const [isPosInitLoading, setIsPosInitLoading] = useState(true);
+  const [isCheckoutLoading, setIsCheckoutLoading] = useState(false);
+  const [isLogoutLoading, setIsLogoutLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   // Authentication check
   useEffect(() => {
@@ -192,10 +202,21 @@ export default function App() {
         setRecipes(r);
       }
     };
-    loadData();
+    // Initial load with loader
+    const initialLoad = async () => {
+      startLoading('pos-init');
+      setIsPosInitLoading(true);
+      try {
+        await loadData();
+      } finally {
+        setIsPosInitLoading(false);
+        stopLoading('pos-init');
+      }
+    };
+    initialLoad();
 
     const timer = setInterval(() => setTime(new Date()), 1000);
-    // Refresh menu items periodically in case admin changes them
+    // Background refresh — does NOT trigger loading state
     const refresh = setInterval(loadData, 2000);
     return () => {
       isMounted = false;
@@ -350,40 +371,47 @@ export default function App() {
 
     // Save transaction to local database
     const now = new Date();
-    await saveTransaction({
-      id: txnNumber,
-      date: now.toISOString(),
-      time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
-      cashier: cashierName,
-      items: cart.map(item => ({
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        category: item.category,
-      })),
-      subtotal,
-      discountType,
-      discountRate,
-      discountAmount,
-      vatAmount,
-      total,
-      customerName: discountType !== 'REGULAR' ? customerName : undefined,
-      customerIdNumber: discountType !== 'REGULAR' ? customerIdNumber : undefined,
-      cashTendered: cash,
-      change: Math.max(0, cash - total),
-      paymentMethod: 'Cash',
-      orNumber: receiptOption === 'With OR' ? orNumber.trim() : undefined,
-    });
+    setIsCheckoutLoading(true);
+    startLoading('checkout');
+    try {
+      await saveTransaction({
+        id: txnNumber,
+        date: now.toISOString(),
+        time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
+        cashier: cashierName,
+        items: cart.map(item => ({
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          category: item.category,
+        })),
+        subtotal,
+        discountType,
+        discountRate,
+        discountAmount,
+        vatAmount,
+        total,
+        customerName: discountType !== 'REGULAR' ? customerName : undefined,
+        customerIdNumber: discountType !== 'REGULAR' ? customerIdNumber : undefined,
+        cashTendered: cash,
+        change: Math.max(0, cash - total),
+        paymentMethod: 'Cash',
+        orNumber: receiptOption === 'With OR' ? orNumber.trim() : undefined,
+      });
 
-    // Deduct inventory
-    if (cart.length > 0) {
-      await deductIngredientsByRecipe(cart.map(c => ({ id: c.id, quantity: c.quantity })), txnNumber);
-      const updatedInv = await getInventoryItems();
-      setInventory(updatedInv);
+      // Deduct inventory
+      if (cart.length > 0) {
+        await deductIngredientsByRecipe(cart.map(c => ({ id: c.id, quantity: c.quantity })), txnNumber);
+        const updatedInv = await getInventoryItems();
+        setInventory(updatedInv);
+      }
+
+      setShowReceipt(true);
+      setShowPaymentModal(false);
+    } finally {
+      setIsCheckoutLoading(false);
+      stopLoading('checkout');
     }
-
-    setShowReceipt(true);
-    setShowPaymentModal(false);
   };
 
   const startNewTransaction = () => {
@@ -418,44 +446,59 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen select-none print:block print:h-auto print:bg-white">
       {/* Header Bar */}
-      <header className="no-print h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-10 text-white shadow-xl shrink-0 z-20">
-        <div className="flex items-center gap-5">
-          <div className="bg-white p-2 rounded-xl shadow-lg">
-            <span className="text-2xl leading-none">🦅</span>
+      <header className="no-print h-16 md:h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-4 md:px-10 text-white shadow-xl shrink-0 z-40 relative">
+        <div className="flex items-center gap-3 md:gap-5">
+          <button 
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="lg:hidden p-2 -ml-2 rounded-xl hover:bg-white/10 transition-colors"
+          >
+            <Menu className="w-5 h-5 md:w-6 md:h-6" />
+          </button>
+          <div className="bg-white p-1.5 md:p-2 rounded-xl shadow-lg">
+            <span className="text-xl md:text-2xl leading-none">🦅</span>
           </div>
-          <div>
-            <h1 className="font-heading font-bold text-xl leading-tight tracking-tight">AlumniCafe</h1>
-            <p className="text-[11px] uppercase tracking-[0.2em] text-hcdc-gold font-semibold">Holy Cross of Davao College</p>
+          <div className="hidden sm:block">
+            <h1 className="font-heading font-bold text-lg md:text-xl leading-tight tracking-tight">AlumniCafe</h1>
+            <p className="text-[9px] md:text-[11px] uppercase tracking-[0.2em] text-hcdc-gold font-semibold">Holy Cross of Davao College</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-10">
-          <div className="flex items-center gap-4 bg-white/5 px-6 py-2 rounded-full border border-white/10 backdrop-blur-sm">
+        <div className="flex items-center gap-4 md:gap-10">
+          <div className="hidden lg:flex items-center gap-4 bg-white/5 px-6 py-2 rounded-full border border-white/10 backdrop-blur-sm">
             <Clock className="w-4 h-4 text-hcdc-gold" />
             <span className="text-sm font-semibold tabular-nums tracking-wide">
               {formatDate(time)} <span className="mx-2 opacity-30">|</span> {formatTime(time)}
             </span>
           </div>
 
-
-
           <div className="flex items-center gap-3">
-            <div className="text-right">
+            <div className="text-right hidden sm:block">
               <p className="text-sm font-bold">{cashierName}</p>
               <p className="text-[10px] text-white/50 font-medium uppercase tracking-wider">Terminal #01</p>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               {localStorage.getItem('cashier_role') === 'Admin' && (
                 <Link
                   to="/admin"
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-white/10 text-hcdc-gold mr-2"
+                  className="px-3 md:px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-[10px] md:text-xs font-bold transition-all flex items-center gap-2 border border-white/10 text-hcdc-gold md:mr-2"
                 >
-                  <LayoutDashboard className="w-3 h-3" /> Admin Dashboard
+                  <LayoutDashboard className="w-4 h-4" /> <span className="hidden md:inline">Admin</span>
                 </Link>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-hcdc-gold flex items-center justify-center text-hcdc-blue font-black text-sm shadow-lg">
+              <button
+                onClick={() => setIsCartOpen(!isCartOpen)}
+                className="lg:hidden w-10 h-10 rounded-xl bg-hcdc-red text-white flex items-center justify-center relative shadow-lg"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {totalItems > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 bg-white text-hcdc-red text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                    {totalItems}
+                  </span>
+                )}
+              </button>
+              <div className="hidden sm:flex w-10 h-10 rounded-xl bg-hcdc-gold items-center justify-center text-hcdc-blue font-black text-sm shadow-lg">
                 {cashierName.charAt(0).toUpperCase()}
               </div>
               <button
@@ -471,18 +514,32 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <div className="no-print flex flex-1 overflow-hidden">
+      <div className="no-print flex flex-1 overflow-hidden relative">
+
+        {/* Mobile Sidebar Overlay */}
+        {isSidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden" 
+            onClick={() => setIsSidebarOpen(false)} 
+          />
+        )}
 
         {/* Left Side: Categories & Products */}
-        <aside className="w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 shadow-sm z-10">
-          <div className="p-6">
-            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-6 flex items-center gap-3">
+        <aside className={`fixed inset-y-0 left-0 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out w-64 bg-white border-r border-gray-100 flex flex-col shrink-0 shadow-xl lg:shadow-sm z-30 lg:z-10 h-full`}>
+          <div className="p-4 md:p-6 flex-1 overflow-y-auto custom-scrollbar">
+            <div className="flex items-center justify-between mb-6 lg:hidden">
+              <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-3">
+                <Tag className="w-3 h-3 text-hcdc-gold" /> Categories
+              </h2>
+              <button onClick={() => setIsSidebarOpen(false)} className="p-2 bg-gray-100 rounded-full"><X className="w-4 h-4"/></button>
+            </div>
+            <h2 className="hidden lg:flex text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-6 items-center gap-3">
               <Tag className="w-3 h-3 text-hcdc-gold" /> Menu Categories
             </h2>
-            <nav className="flex flex-col gap-3">
+            <nav className="flex flex-col gap-2 md:gap-3">
               <button
-                onClick={() => setCurrentCategory('All Items')}
-                className={`flex items-center gap-5 px-6 py-4 rounded-2xl transition-all duration-300 group text-left relative overflow-hidden ${currentCategory === 'All Items'
+                onClick={() => { setCurrentCategory('All Items'); setIsSidebarOpen(false); }}
+                className={`flex items-center gap-5 px-4 md:px-6 py-3 md:py-4 rounded-2xl transition-all duration-300 group text-left relative overflow-hidden ${currentCategory === 'All Items'
                   ? 'bg-hcdc-blue text-white shadow-xl shadow-hcdc-blue/20 translate-x-1'
                   : 'hover:bg-hcdc-light-blue text-gray-500 hover:text-hcdc-blue'
                   }`}
@@ -495,8 +552,8 @@ export default function App() {
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => setCurrentCategory(cat)}
-                  className={`flex items-center gap-5 px-6 py-4 rounded-2xl transition-all duration-300 group text-left relative overflow-hidden ${currentCategory === cat
+                  onClick={() => { setCurrentCategory(cat); setIsSidebarOpen(false); }}
+                  className={`flex items-center gap-5 px-4 md:px-6 py-3 md:py-4 rounded-2xl transition-all duration-300 group text-left relative overflow-hidden ${currentCategory === cat
                     ? 'bg-hcdc-blue text-white shadow-xl shadow-hcdc-blue/20 translate-x-1'
                     : 'hover:bg-hcdc-light-blue text-gray-500 hover:text-hcdc-blue'
                     }`}
@@ -509,8 +566,8 @@ export default function App() {
               ))}
             </nav>
           </div>
-          <div className="mt-auto p-6 bg-gradient-to-b from-transparent to-hcdc-light-blue/20">
-            <div className="p-4 rounded-2xl bg-white border border-hcdc-blue/5 shadow-sm text-center">
+          <div className="mt-auto p-4 md:p-6 bg-gradient-to-b from-transparent to-hcdc-light-blue/20">
+            <div className="p-4 rounded-2xl bg-white border border-hcdc-blue/5 shadow-sm text-center hidden md:block">
               <p className="text-[10px] text-hcdc-blue font-black uppercase tracking-widest mb-1 italic">
                 Our Mission
               </p>
@@ -522,10 +579,10 @@ export default function App() {
         </aside>
 
         {/* PANEL 2: Product Grid */}
-        <section className="flex-1 bg-[#F9FAFB] p-10 flex flex-col min-w-0 overflow-hidden">
-          <div className="mb-10 flex justify-between items-center bg-white py-3 px-6 rounded-2xl border border-gray-100 shadow-sm">
+        <section className="flex-1 bg-[#F9FAFB] p-4 md:p-10 flex flex-col min-w-0 overflow-hidden w-full relative">
+          <div className="mb-4 md:mb-10 flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white py-3 px-4 md:px-6 rounded-2xl border border-gray-100 shadow-sm gap-4 sm:gap-0">
             <div className="flex items-center gap-4 w-full">
-              <Search className="w-5 h-5 text-gray-400" />
+              <Search className="w-5 h-5 text-gray-400 shrink-0" />
               <input
                 type="text"
                 placeholder="Search menu items..."
@@ -535,12 +592,15 @@ export default function App() {
               />
             </div>
             <div className="flex items-center gap-2 text-[11px] font-bold text-gray-400 uppercase tracking-widest whitespace-nowrap bg-gray-50 px-4 py-2 rounded-xl">
-              <CheckCircle2 className="w-3 h-3 text-green-500" /> System Online
+              <CheckCircle2 className="w-3 h-3 text-green-500" /> <span className="hidden sm:inline">System</span> Online
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto pr-4 -mr-4 custom-scrollbar">
-            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 pb-12">
+          <div className="flex-1 overflow-y-auto pr-2 md:pr-4 -mr-2 md:-mr-4 custom-scrollbar">
+            {isPosInitLoading ? (
+              <SkeletonCard count={12} variant="menu" />
+            ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 pb-12">
               {filteredProducts.map((product) => {
                 let minServings = Infinity;
                 let hasInventoryTracking = false;
@@ -617,24 +677,33 @@ export default function App() {
                 );
               })}
             </div>
+            )}
           </div>
         </section>
 
-        {/* PANEL 3: Order Sidebar (Replaced Footer) */}
-        <aside className={`w-[400px] bg-white border-l border-gray-100 flex flex-col shadow-[-10px_0_30px_rgba(0,0,0,0.02)] z-30 transition-all duration-300 shrink-0`}>
+        {/* Mobile Cart Overlay */}
+        {isCartOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden" 
+            onClick={() => setIsCartOpen(false)} 
+          />
+        )}
+
+        {/* PANEL 3: Order Sidebar */}
+        <aside className={`fixed inset-y-0 right-0 transform ${isCartOpen ? 'translate-x-0' : 'translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out w-[85vw] sm:w-[400px] bg-white border-l border-gray-100 flex flex-col shadow-2xl lg:shadow-[-10px_0_30px_rgba(0,0,0,0.02)] z-30 h-full shrink-0`}>
           {/* Cart Header */}
-          <div className="px-8 py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/30 shrink-0">
-            <div className="flex items-center gap-4">
+          <div className="px-4 md:px-8 py-4 md:py-6 border-b border-gray-100 flex justify-between items-center bg-gray-50/30 shrink-0 mt-16 md:mt-0 lg:mt-0">
+            <div className="flex items-center gap-3 md:gap-4">
               <div className="relative">
-                <div className="w-10 h-10 rounded-xl bg-hcdc-blue/5 flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-hcdc-blue" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-hcdc-blue/5 flex items-center justify-center">
+                  <ShoppingCart className="w-4 h-4 md:w-5 md:h-5 text-hcdc-blue" />
                 </div>
                 <AnimatePresence>
                   {totalItems > 0 && (
                     <motion.span
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      className="absolute -top-1.5 -right-1.5 bg-hcdc-red text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm border-2 border-white"
+                      className="absolute -top-1.5 -right-1.5 bg-hcdc-red text-white text-[9px] md:text-[10px] font-black w-4 h-4 md:w-5 md:h-5 rounded-full flex items-center justify-center shadow-sm border-2 border-white"
                     >
                       {totalItems}
                     </motion.span>
@@ -642,23 +711,31 @@ export default function App() {
                 </AnimatePresence>
               </div>
               <div>
-                <h2 className="font-heading font-black text-sm uppercase tracking-widest text-hcdc-blue">
+                <h2 className="font-heading font-black text-xs md:text-sm uppercase tracking-widest text-hcdc-blue">
                   Current Order
                 </h2>
-                <p className="text-gray-400 font-mono text-[10px] mt-0.5">{txnNumber}</p>
+                <p className="text-gray-400 font-mono text-[9px] md:text-[10px] mt-0.5">{txnNumber}</p>
               </div>
             </div>
-            <button
-              onClick={clearOrder}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-hcdc-red hover:bg-hcdc-light-red transition-all"
-              title="Clear Order"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={clearOrder}
+                className="w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-gray-400 hover:text-hcdc-red hover:bg-hcdc-light-red transition-all"
+                title="Clear Order"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+              <button 
+                onClick={() => setIsCartOpen(false)}
+                className="lg:hidden w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           {/* Cart Items List */}
-          <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-4 custom-scrollbar bg-gray-50/10">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col gap-3 md:gap-4 custom-scrollbar bg-gray-50/10">
             {cart.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center text-gray-300">
                 <div className="w-24 h-24 mb-4 rounded-full bg-gray-50 flex items-center justify-center">
@@ -716,13 +793,13 @@ export default function App() {
           </div>
 
           {/* Checkout Area */}
-          <div className="bg-white border-t border-gray-100 p-8 shrink-0">
+          <div className="bg-white border-t border-gray-100 p-4 md:p-8 shrink-0 pb-safe">
             {/* Discounts */}
-            <div className="mb-6">
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-3">
+            <div className="mb-4 md:mb-6">
+              <label className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2 md:mb-3">
                 Apply Discount
               </label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-1.5 md:gap-2">
                 {(['REGULAR', 'PWD', 'SENIOR', 'ALUMNI'] as DiscountType[]).map((type) => (
                   <button
                     key={type}
@@ -764,8 +841,8 @@ export default function App() {
             )}
 
             {/* Totals Summary */}
-            <div className="space-y-2 mb-6">
-              <div className="flex justify-between text-xs font-bold text-gray-400">
+            <div className="space-y-1.5 md:space-y-2 mb-4 md:mb-6">
+              <div className="flex justify-between text-[10px] md:text-xs font-bold text-gray-400">
                 <span>SUBTOTAL</span>
                 <span className="text-gray-600 font-mono">{formatCurrency(subtotal)}</span>
               </div>
@@ -801,14 +878,14 @@ export default function App() {
       {/* PAYMENT MODAL */}
       <AnimatePresence>
         {showPaymentModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print">
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm sm:p-4 no-print">
             <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              initial={{ scale: 0.9, opacity: 0, y: 50 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100"
+              exit={{ scale: 0.9, opacity: 0, y: 50 }}
+              className="bg-white rounded-t-[2rem] sm:rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]"
             >
-              <div className="bg-hcdc-blue p-8 text-white flex justify-between items-start">
+              <div className="bg-hcdc-blue p-6 md:p-8 text-white flex justify-between items-start shrink-0">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-widest opacity-60 mb-2">Checkout Summary</h3>
                   <p className="text-4xl font-black tracking-tighter">{formatCurrency(total)}</p>
@@ -819,13 +896,13 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="p-10 space-y-6">
-                <div className="space-y-4">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+              <div className="p-6 md:p-10 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 pb-safe">
+                <div className="space-y-3 md:space-y-4">
+                  <label className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
                     <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
                   </label>
                   <div className="relative group">
-                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
+                    <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-2xl md:text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
                     <input
                       autoFocus
                       type="number"
@@ -851,12 +928,12 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="bg-gray-50 p-6 rounded-3xl border border-gray-100 mt-6">
-                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 block mb-4 flex items-center gap-2">
+                <div className="bg-gray-50 p-4 md:p-6 rounded-3xl border border-gray-100 mt-4 md:mt-6">
+                  <label className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 block mb-3 md:mb-4 flex items-center gap-2">
                     <Receipt className="w-4 h-4 text-hcdc-blue" /> Request Official Receipt?
                   </label>
-                  <div className="flex gap-4">
-                    <label className={`flex-1 flex items-center gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${receiptOption === 'With OR' ? 'border-hcdc-blue bg-white shadow-md' : 'border-gray-200 hover:bg-gray-100/50 hover:border-gray-300'}`}>
+                  <div className="flex gap-2 md:gap-4">
+                    <label className={`flex-1 flex items-center gap-2 md:gap-3 p-3 md:p-4 rounded-2xl border-2 cursor-pointer transition-all ${receiptOption === 'With OR' ? 'border-hcdc-blue bg-white shadow-md' : 'border-gray-200 hover:bg-gray-100/50 hover:border-gray-300'}`}>
                       <input 
                         type="radio" 
                         name="receipt" 
@@ -895,20 +972,22 @@ export default function App() {
                   </div>
                 )}
 
-                <div className="flex gap-4 mt-8">
+                <div className="flex gap-3 md:gap-4 mt-6 md:mt-8 pb-4">
                   <button
                     onClick={() => { setShowPaymentModal(false); setCashTendered(''); setOnlineReference(''); setOrNumber(''); setPaymentMethod('Cash'); setReceiptOption('Without OR'); }}
                     className="flex-1 h-16 bg-white border-2 border-gray-100 text-gray-400 font-black rounded-2xl hover:bg-gray-50 hover:text-gray-600 transition-all uppercase tracking-widest text-xs"
                   >
                     Cancel
                   </button>
-                  <button
+                  <ButtonLoader
+                    loading={isCheckoutLoading}
+                    loadingLabel="Processing…"
                     onClick={processPayment}
                     disabled={(cash < total) || (receiptOption === 'With OR' && !orNumber.trim()) || total <= 0}
-                    className="flex-[2] h-16 bg-hcdc-red hover:bg-[#A01E1F] text-white font-black rounded-2xl shadow-xl shadow-hcdc-red/30 flex items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 disabled:shadow-none text-lg uppercase tracking-wide"
+                    className="flex-[2] h-14 md:h-16 bg-hcdc-red hover:bg-[#A01E1F] text-white font-black rounded-2xl shadow-xl shadow-hcdc-red/30 flex items-center justify-center gap-2 md:gap-4 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 disabled:shadow-none text-sm md:text-lg uppercase tracking-wide"
                   >
                     Confirm Payment
-                  </button>
+                  </ButtonLoader>
                 </div>
               </div>
             </motion.div>
@@ -924,7 +1003,7 @@ export default function App() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-3xl w-full max-w-md h-[90vh] flex flex-col shadow-2xl overflow-hidden print:shadow-none print:h-auto print:rounded-none print:max-w-none print:w-full print:block"
+              className="bg-white rounded-2xl md:rounded-3xl w-full max-w-md h-[90vh] md:h-[80vh] flex flex-col shadow-2xl overflow-hidden print:shadow-none print:h-auto print:rounded-none print:max-w-none print:w-full print:block"
             >
               <div className="no-print p-4 flex justify-between items-center border-b border-gray-100 shrink-0">
                 <h3 className="font-bold flex items-center gap-2"><CheckCircle2 className="text-green-500" /> Transaction Complete</h3>

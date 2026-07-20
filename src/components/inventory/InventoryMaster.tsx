@@ -89,11 +89,11 @@ export default function InventoryMaster() {
   const getCatName = (id: string) => id || 'Unknown';
 
   return (
-    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[700px]">
-      <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
-        <div className="flex gap-4 items-center flex-1">
-          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm w-72">
-            <Search className="w-4 h-4 text-gray-400" />
+    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[700px] max-h-[80vh]">
+      <div className="p-4 md:p-6 border-b border-gray-50 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gray-50/50">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 items-center w-full xl:w-auto flex-1">
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm w-full sm:w-64 md:w-72">
+            <Search className="w-4 h-4 text-gray-400 shrink-0" />
             <input 
               type="text" placeholder="Search items..." 
               value={search} onChange={e => setSearch(e.target.value)}
@@ -102,26 +102,26 @@ export default function InventoryMaster() {
           </div>
           <select 
             value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)}
-            className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue outline-none"
+            className="w-full sm:w-auto flex-1 md:flex-none bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue outline-none"
           >
             <option value="All">All Categories</option>
             {categories.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
           <select 
             value={stockFilter} onChange={e => setStockFilter(e.target.value as 'All' | 'Low')}
-            className="bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue outline-none"
+            className="w-full sm:w-auto flex-1 md:flex-none bg-white border border-gray-200 text-gray-600 px-4 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue outline-none"
           >
             <option value="All">All Stock Levels</option>
             <option value="Low">Low Stock Only</option>
           </select>
         </div>
-        <button onClick={openAdd} className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
+        <button onClick={openAdd} className="w-full xl:w-auto justify-center bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
           <Plus className="w-4 h-4" /> Add Item
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-        <table className="w-full text-left">
+      <div className="flex-1 overflow-x-auto w-full custom-scrollbar">
+        <table className="w-full text-left min-w-[1000px]">
           <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10">
             <tr className="text-[10px] uppercase tracking-widest text-gray-400 font-black">
               <th className="p-4 pl-6">Item Name</th>
@@ -170,11 +170,11 @@ export default function InventoryMaster() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl p-8 border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-[2rem] w-full max-w-2xl shadow-2xl p-6 md:p-8 border border-gray-100 my-auto">
             <h3 className="text-xl font-black text-gray-800 mb-6">{editingItem ? 'Edit Item' : 'Add New Item'}</h3>
             <form onSubmit={handleSave} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Item Name</label>
                   <input required type="text" value={form.item_name} onChange={e => setForm({...form, item_name: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />

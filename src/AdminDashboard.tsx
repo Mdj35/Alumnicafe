@@ -1042,120 +1042,122 @@ export default function AdminDashboard() {
   return (
     <div className="flex flex-col h-screen select-none print:block print:h-auto print:bg-white">
       {/* Admin Header */}
-      <header className="no-print h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-10 text-white shadow-xl shrink-0 z-20">
-        <div className="flex items-center gap-5">
-          <Link to="/" className="flex items-center gap-3 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl transition-all border border-white/10">
+      <header className="no-print h-16 md:h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-4 md:px-10 text-white shadow-xl shrink-0 z-20">
+        <div className="flex items-center gap-3 md:gap-5">
+          <Link to="/" className="flex items-center gap-2 md:gap-3 bg-white/10 hover:bg-white/20 px-3 md:px-4 py-2 rounded-xl transition-all border border-white/10">
             <ArrowLeft className="w-4 h-4" />
-            <span className="text-xs font-black uppercase tracking-wider">POS Terminal</span>
+            <span className="hidden sm:inline text-xs font-black uppercase tracking-wider">POS Terminal</span>
           </Link>
-          <div className="w-px h-8 bg-white/20" />
-          <div className="flex items-center gap-3">
-            <div className="bg-white p-2 rounded-xl shadow-lg">
-              <Shield className="w-5 h-5 text-hcdc-blue" />
+          <div className="w-px h-6 md:h-8 bg-white/20" />
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="bg-white p-1.5 md:p-2 rounded-xl shadow-lg">
+              <Shield className="w-4 h-4 md:w-5 md:h-5 text-hcdc-blue" />
             </div>
-            <div>
-              <h1 className="font-heading font-bold text-xl leading-tight tracking-tight">Admin Dashboard</h1>
-              <p className="text-[11px] uppercase tracking-[0.2em] text-hcdc-gold font-semibold">AlumniCafe Management</p>
+            <div className="hidden sm:block">
+              <h1 className="font-heading font-bold text-lg md:text-xl leading-tight tracking-tight">Admin Dashboard</h1>
+              <p className="text-[9px] md:text-[11px] uppercase tracking-[0.2em] text-hcdc-gold font-semibold">AlumniCafe Management</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4 bg-white/5 px-6 py-2 rounded-full border border-white/10 backdrop-blur-sm">
+        <div className="flex items-center gap-4 bg-white/5 px-4 md:px-6 py-2 rounded-full border border-white/10 backdrop-blur-sm">
           <Clock className="w-4 h-4 text-hcdc-gold" />
-          <span className="text-sm font-semibold tabular-nums tracking-wide">
-            {formatDate(time)} <span className="mx-2 opacity-30">|</span> {formatTime(time)}
+          <span className="text-xs md:text-sm font-semibold tabular-nums tracking-wide">
+            {formatDate(time)} <span className="mx-2 opacity-30 hidden sm:inline">|</span> <span className="hidden sm:inline">{formatTime(time)}</span>
           </span>
         </div>
       </header>
 
-      <div className="no-print flex-1 bg-[#F9FAFB] p-10 flex flex-col overflow-hidden">
+      <div className="no-print flex-1 bg-[#F9FAFB] p-4 md:p-10 flex flex-col min-w-0 overflow-hidden w-full relative">
         {/* Admin Header */}
-        <div className="flex justify-between items-end mb-8 shrink-0">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-4 md:mb-8 shrink-0 gap-4">
           <div>
-            <h2 className="text-3xl font-black text-hcdc-blue tracking-tight">Admin Dashboard</h2>
-            <p className="text-gray-500 font-medium mt-1">Overview, performance, and management.</p>
+            <h2 className="text-2xl md:text-3xl font-black text-hcdc-blue tracking-tight">Admin Dashboard</h2>
+            <p className="text-gray-500 font-medium text-xs md:text-sm mt-1">Overview, performance, and management.</p>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100">
-            <button
-              onClick={() => setActiveTab('analytics')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'analytics' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
-                }`}
-            >
-              <TrendingUp className="w-4 h-4" /> Analytics & Trends
-            </button>
-            <button
-              onClick={() => setActiveTab('cashiers')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'cashiers' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
-                }`}
-            >
-              <Users className="w-4 h-4" /> Cashier Accounts
-            </button>
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'reports' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
-                }`}
-            >
-              <FileText className="w-4 h-4" /> Sales Report
-            </button>
-            <button
-              onClick={() => setActiveTab('menu')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'menu' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
-                }`}
-            >
-              <UtensilsCrossed className="w-4 h-4" /> Menu Items
-            </button>
-            <button
-              onClick={() => setActiveTab('inventory')}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${activeTab === 'inventory' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
-                }`}
-            >
-              <Package className="w-4 h-4" /> Inventory
-            </button>
+          <div className="w-full xl:w-auto overflow-x-auto custom-scrollbar pb-2 xl:pb-0">
+            <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 min-w-max">
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${activeTab === 'analytics' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                  }`}
+              >
+                <TrendingUp className="w-4 h-4" /> Analytics & Trends
+              </button>
+              <button
+                onClick={() => setActiveTab('cashiers')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${activeTab === 'cashiers' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                  }`}
+              >
+                <Users className="w-4 h-4" /> Cashier Accounts
+              </button>
+              <button
+                onClick={() => setActiveTab('reports')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${activeTab === 'reports' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                  }`}
+              >
+                <FileText className="w-4 h-4" /> Sales Report
+              </button>
+              <button
+                onClick={() => setActiveTab('menu')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${activeTab === 'menu' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                  }`}
+              >
+                <UtensilsCrossed className="w-4 h-4" /> Menu Items
+              </button>
+              <button
+                onClick={() => setActiveTab('inventory')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${activeTab === 'inventory' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                  }`}
+              >
+                <Package className="w-4 h-4" /> Inventory
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Main Content Area - Scrollable */}
-        <div className="flex-1 overflow-y-auto pr-4 custom-scrollbar -mr-4 pb-10">
+        <div className="flex-1 overflow-y-auto pr-2 md:pr-4 custom-scrollbar -mr-2 md:-mr-4 pb-10">
 
           {/* --- ANALYTICS TAB --- */}
           {activeTab === 'analytics' && (
             <div className="space-y-6">
               {/* Global Analytics Filter */}
-              <div className="flex justify-end mb-2 gap-3 items-center">
+              <div className="flex flex-col md:flex-row justify-between md:justify-end mb-2 gap-3 md:items-center">
                 {analyticsPeriod === 'specific' && (
-                  <div className="flex items-center">
+                  <div className="flex items-center w-full md:w-auto">
                     <input
                       type="date"
                       value={analyticsSpecificDate}
                       onChange={(e) => setAnalyticsSpecificDate(e.target.value)}
-                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px]"
+                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px] w-full"
                     />
                   </div>
                 )}
                 {analyticsPeriod === 'range' && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
                     <input
                       type="date"
                       value={analyticsSpecificDate}
                       onChange={(e) => setAnalyticsSpecificDate(e.target.value)}
-                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px]"
+                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px] w-full sm:w-auto"
                     />
-                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest">to</span>
+                    <span className="text-gray-400 font-bold text-[10px] uppercase tracking-widest hidden sm:inline">to</span>
                     <input
                       type="date"
                       value={analyticsSpecificDateEnd}
                       onChange={(e) => setAnalyticsSpecificDateEnd(e.target.value)}
-                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px]"
+                      className="bg-white border-2 border-gray-100 text-gray-600 px-4 py-2.5 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none h-[42px] w-full sm:w-auto"
                     />
                   </div>
                 )}
-                <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 overflow-x-auto w-full md:w-auto min-w-max">
                   {(['daily', 'weekly', 'monthly', 'specific', 'range'] as const).map(period => (
                     <button
                       key={period}
                       onClick={() => setAnalyticsPeriod(period)}
-                      className={`px-8 py-2.5 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${analyticsPeriod === period ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                      className={`flex-1 md:flex-none px-4 md:px-8 py-2.5 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${analyticsPeriod === period ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
                         }`}
                     >
                       {period}
@@ -1165,7 +1167,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* KPI Cards */}
-              <div className="grid grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 {[
                   { label: `Total Sales (${analyticsPeriod})`, value: `₱ ${totalSalesPeriod.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, trend: salesTrend.trend, up: salesTrend.up, icon: <BanknoteArrowUp className="w-6 h-6 text-hcdc-blue" /> },
                   { label: `Total Orders (${analyticsPeriod})`, value: totalOrdersPeriod.toString(), trend: ordersTrend.trend, up: ordersTrend.up, icon: <FileText className="w-6 h-6 text-hcdc-gold" /> },
@@ -1183,17 +1185,17 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                     <div>
-                      <h3 className="text-3xl font-black text-gray-800 tracking-tight">{kpi.value}</h3>
-                      <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400 mt-1">{kpi.label}</p>
+                      <h3 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight">{kpi.value}</h3>
+                      <p className="text-[9px] md:text-[11px] font-bold uppercase tracking-widest text-gray-400 mt-1">{kpi.label}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
               {/* Charts Section */}
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                 {/* Main Trend Chart */}
-                <div className="col-span-2 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
+                <div className="lg:col-span-2 bg-white p-4 md:p-6 rounded-3xl border border-gray-100 shadow-sm">
                   <div className="flex justify-between items-center mb-8">
                     <div>
                       <h3 className="text-lg font-black text-gray-800">Revenue Trends</h3>
@@ -1223,9 +1225,9 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Category Breakdown */}
-                <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col">
-                  <div className="mb-8">
-                    <h3 className="text-lg font-black text-gray-800">Sales by Category</h3>
+                <div className="bg-white p-4 md:p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col min-h-[250px]">
+                  <div className="mb-4 md:mb-8">
+                    <h3 className="text-base md:text-lg font-black text-gray-800">Sales by Category</h3>
                     <p className="text-xs text-gray-500 font-medium">Distribution of revenue</p>
                   </div>
                   <div className="flex-1 flex flex-col justify-center gap-4">
@@ -1304,23 +1306,23 @@ export default function AdminDashboard() {
           {activeTab === 'cashiers' && (
             <div className="space-y-8">
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                <div className="p-4 md:p-8 border-b border-gray-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50/50">
                 <div>
-                  <h3 className="text-xl font-black text-gray-800">Manage Accounts</h3>
-                  <p className="text-xs text-gray-500 font-medium mt-1">Add, edit, or disable cashier access.</p>
+                  <h3 className="text-lg md:text-xl font-black text-gray-800">Manage Accounts</h3>
+                  <p className="text-[10px] md:text-xs text-gray-500 font-medium mt-1">Add, edit, or disable cashier access.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setShowCashierReportList(true)} className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors shadow-sm">
+                <div className="flex flex-col sm:flex-row items-center gap-2 md:gap-3 w-full sm:w-auto">
+                  <button onClick={() => setShowCashierReportList(true)} className="w-full sm:w-auto bg-white border border-gray-200 text-gray-700 px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm">
                     <FileText className="w-4 h-4" /> Cashier Report
                   </button>
-                  <button onClick={() => setShowCashierModal(true)} className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
+                  <button onClick={() => setShowCashierModal(true)} className="w-full sm:w-auto bg-hcdc-blue text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
                     <Plus className="w-4 h-4" /> Add Cashier
                   </button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
+              <div className="overflow-x-auto w-full">
+                <table className="w-full text-left min-w-[800px]">
                   <thead>
                     <tr className="bg-white border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black">
                       <th className="p-6 font-black">Name</th>
@@ -1386,19 +1388,19 @@ export default function AdminDashboard() {
 
           {/* --- SALES REPORT TAB --- */}
           {activeTab === 'reports' && (
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[700px]">
-              <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50 shrink-0">
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[700px] max-h-[80vh]">
+              <div className="p-4 md:p-8 border-b border-gray-50 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 bg-gray-50/50 shrink-0">
                 <div>
-                  <h3 className="text-xl font-black text-gray-800">Transaction History</h3>
-                  <p className="text-xs text-gray-500 font-medium mt-1">Detailed log of all sales.</p>
+                  <h3 className="text-lg md:text-xl font-black text-gray-800">Transaction History</h3>
+                  <p className="text-[10px] md:text-xs text-gray-500 font-medium mt-1">Detailed log of all sales.</p>
                 </div>
-                <div className="flex gap-3 items-center">
-                  <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100">
+                <div className="flex flex-wrap gap-2 md:gap-3 items-center w-full xl:w-auto">
+                  <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 overflow-x-auto w-full md:w-auto">
                     {(['daily', 'weekly', 'monthly', 'specific', 'range'] as const).map(period => (
                       <button
                         key={period}
                         onClick={() => setReportPeriod(period)}
-                        className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${reportPeriod === period ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                        className={`flex-1 md:flex-none px-3 md:px-4 py-2 rounded-lg text-[10px] md:text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${reportPeriod === period ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
                           }`}
                       >
                         {period}
@@ -1482,15 +1484,15 @@ export default function AdminDashboard() {
                   <button
                     onClick={() => handleReportExport('daily', sortedTransactions)}
                     disabled={sortedTransactions.length === 0}
-                    className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full md:w-auto bg-hcdc-blue text-white px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm flex items-center justify-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <Download className="w-4 h-4" /> Export XLSX
+                    <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export</span> XLSX
                   </button>
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto">
-                <table className="w-full text-left">
+              <div className="flex-1 overflow-x-auto w-full custom-scrollbar">
+                <table className="w-full text-left min-w-[800px]">
                   <thead className="sticky top-0 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] z-10">
                     <tr className="border-b border-gray-100 text-[10px] uppercase tracking-widest text-gray-400 font-black">
                       <th className="p-6 font-black">Transaction ID</th>
@@ -1564,10 +1566,10 @@ export default function AdminDashboard() {
           {activeTab === 'menu' && (
             <div className="space-y-6">
               {/* Controls */}
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-4 flex-1">
-                  <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-2xl border border-gray-100 shadow-sm flex-1 max-w-md">
-                    <Search className="w-4 h-4 text-gray-400" />
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-4 w-full md:w-auto flex-1">
+                  <div className="flex items-center gap-3 bg-white px-4 md:px-5 py-2.5 md:py-3 rounded-2xl border border-gray-100 shadow-sm w-full md:max-w-md">
+                    <Search className="w-4 h-4 text-gray-400 shrink-0" />
                     <input
                       type="text"
                       placeholder="Search menu items..."
@@ -1576,30 +1578,30 @@ export default function AdminDashboard() {
                       className="bg-transparent border-none focus:ring-0 text-sm font-medium w-full"
                     />
                   </div>
-                  <div className="flex bg-white p-1 rounded-xl border border-gray-100 shadow-sm overflow-x-auto max-w-full no-scrollbar">
+                  <div className="flex bg-white p-1 rounded-xl border border-gray-100 shadow-sm overflow-x-auto w-full md:w-auto no-scrollbar">
                     <button
                       onClick={() => setMenuCategoryFilter('All')}
-                      className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${menuCategoryFilter === 'All' ? 'bg-hcdc-blue text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                      className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${menuCategoryFilter === 'All' ? 'bg-hcdc-blue text-white' : 'text-gray-400 hover:text-gray-700'}`}
                     >All</button>
                     {categories.map(cat => (
                       <button
                         key={cat}
                         onClick={() => setMenuCategoryFilter(cat)}
-                        className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap ${menuCategoryFilter === cat ? 'bg-hcdc-blue text-white' : 'text-gray-400 hover:text-gray-700'}`}
+                        className={`flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors whitespace-nowrap ${menuCategoryFilter === cat ? 'bg-hcdc-blue text-white' : 'text-gray-400 hover:text-gray-700'}`}
                       >{cat}</button>
                     ))}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 w-full md:w-auto">
                   <button
                     onClick={() => setShowCategoryManager(true)}
-                    className="bg-hcdc-gold text-hcdc-blue px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-[#D4921C] transition-colors shadow-md"
+                    className="flex-1 md:flex-none justify-center bg-hcdc-gold text-hcdc-blue px-4 md:px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 hover:bg-[#D4921C] transition-colors shadow-md"
                   >
                     <Tag className="w-4 h-4" /> Categories
                   </button>
                   <button
                     onClick={() => { setShowAddModal(true); setEditingItem(null); setFormData({ name: '', price: '', category: categories[0] || 'Coffee', icon: '☕', image: '', ingredients: [] }); }}
-                    className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md"
+                    className="flex-1 md:flex-none justify-center bg-hcdc-blue text-white px-4 md:px-5 py-2.5 rounded-xl font-bold text-xs md:text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md"
                   >
                     <Plus className="w-4 h-4" /> Add Item
                   </button>
@@ -1607,7 +1609,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Menu Grid */}
-              <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
                 {filteredMenu.map((item) => (
                   <div key={item.id} className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all group relative">
                     <div className="flex flex-col items-center text-center gap-3">
