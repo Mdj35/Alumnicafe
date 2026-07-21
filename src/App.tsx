@@ -454,8 +454,8 @@ export default function App() {
           >
             <Menu className="w-5 h-5 md:w-6 md:h-6" />
           </button>
-          <div className="bg-white p-1.5 md:p-2 rounded-xl shadow-lg">
-            <span className="text-xl md:text-2xl leading-none">🦅</span>
+          <div className="bg-white p-1.5 md:p-2 rounded-xl shadow-lg flex items-center justify-center">
+            <img src={cafeLogo} alt="Alumni Cafe Logo" className="w-6 h-6 md:w-8 md:h-8 object-contain" />
           </div>
           <div className="hidden sm:block">
             <h1 className="font-heading font-bold text-lg md:text-xl leading-tight tracking-tight">AlumniCafe</h1>

@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { getCashiers, recordCashierLogin, updateCashier, CashierAccount } from './cashierStorage';
 import { useLoading } from './context/LoadingContext';
 import ButtonLoader from './components/ui/ButtonLoader';
-
+import cafeLogo from './CAFE.jpg';
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -118,8 +118,8 @@ export default function Login() {
         className="w-full max-w-md bg-white rounded-[2rem] shadow-2xl p-6 sm:p-10 relative z-10 border border-gray-100 mx-4 sm:mx-0"
       >
         <div className="flex flex-col items-center text-center mb-8 sm:mb-10">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-br from-hcdc-blue to-hcdc-blue-dark text-white rounded-3xl flex items-center justify-center text-3xl sm:text-4xl shadow-xl shadow-hcdc-blue/20 mb-4 sm:mb-6 border-4 border-white">
-            🦅
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-3xl flex items-center justify-center shadow-xl shadow-hcdc-blue/20 mb-4 sm:mb-6 border-4 border-white overflow-hidden">
+            <img src={cafeLogo} alt="Alumni Cafe Logo" className="w-full h-full object-contain" />
           </div>
           <h1 className="font-heading font-black text-2xl sm:text-3xl text-gray-800 tracking-tight">AlumniCafe</h1>
           <p className="text-xs uppercase tracking-[0.2em] font-black text-hcdc-gold mt-2">Holy Cross of Davao College</p>

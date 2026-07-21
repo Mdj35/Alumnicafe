@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import ReactDOM from 'react-dom';
 import { useLoading } from '../../context/LoadingContext';
+import cafeLogo from '../../CAFE.jpg';
 
 /**
  * GlobalLoader — renders a fullscreen blurred overlay with an animated spinner.
@@ -41,8 +42,8 @@ const GlobalLoader = memo(function GlobalLoader() {
             }}
           />
           {/* Center logo */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-2xl leading-none select-none">🦅</span>
+          <div className="absolute inset-0 flex items-center justify-center p-3">
+            <img src={cafeLogo} alt="Alumni Cafe Logo" className="w-full h-full object-contain rounded-full" />
           </div>
         </div>
 
