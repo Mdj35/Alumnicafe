@@ -51,7 +51,8 @@ export default function InventoryItems() {
       const updated = await updateInventoryItem(editingItem.id, {
         ...form,
         unit_cost,
-        cost_price: unit_cost
+        cost_price: unit_cost,
+        opening_stock: form.opening_stock
       });
       setItems(updated);
     } else {
@@ -269,12 +270,13 @@ export default function InventoryItems() {
                   </span>
                 </div>
 
-                {!editingItem && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-500 uppercase">Opening Stock Qty (in {form.unit})</label>
-                    <input required type="number" step="0.01" min="0" value={form.opening_stock} onChange={e => setForm({...form, opening_stock: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue outline-none" />
-                  </div>
-                )}
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Opening Stock Qty (in {form.unit})</label>
+                  <input required type="number" step="0.01" min="0" value={form.opening_stock} onChange={e => setForm({...form, opening_stock: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                  {editingItem && (
+                    <p className="text-[10px] text-amber-600 mt-1 font-medium">⚠ Editing this updates the recorded opening balance only. It does not change the current stock level.</p>
+                  )}
+                </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Low Stock Alert Level</label>
                   <input required type="number" step="0.01" min="0" value={form.minimum_stock} onChange={e => setForm({...form, minimum_stock: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue outline-none" />
