@@ -1927,9 +1927,9 @@ export default function AdminDashboard() {
       {/* ADD / EDIT MODAL */}
       <AnimatePresence>
         {(showAddModal || editingItem) && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100">
-              <div className="bg-hcdc-blue p-8 text-white flex justify-between items-center">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh]">
+              <div className="bg-hcdc-blue p-8 text-white flex justify-between items-center shrink-0">
                 <div>
                   <h3 className="text-sm font-black uppercase tracking-widest opacity-60 mb-1">{editingItem ? 'Edit Item' : 'New Menu Item'}</h3>
                   <p className="text-2xl font-black tracking-tight">{editingItem ? formData.name || 'Editing...' : 'Add to Menu'}</p>
@@ -1938,7 +1938,7 @@ export default function AdminDashboard() {
                   <X className="w-5 h-5" />
                 </button>
               </div>
-              <div className="p-10 space-y-6">
+              <div className="p-8 md:p-10 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
                 <div>
                   <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Item Name</label>
                   <input
@@ -2006,7 +2006,7 @@ export default function AdminDashboard() {
                       >
                         <option value="" disabled>Select Stock</option>
                         {inventory.map(stock => (
-                          <option key={stock.id} value={stock.id}>{stock.item_name} ({stock.unit})</option>
+                          <option key={stock.id} value={stock.id}>{stock.item_name} ({stock.usage_unit || stock.unit})</option>
                         ))}
                       </select>
                       <input

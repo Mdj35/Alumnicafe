@@ -243,7 +243,7 @@ export default function StockOpeningClosing() {
                         <td className="p-4 pl-6 text-sm font-mono text-gray-500">{item.item_code}</td>
                         <td className="p-4 font-bold text-gray-800">{item.item_name}</td>
                         <td className="p-4 text-sm font-bold text-gray-500 text-right">₱{(item.unit_cost || 0).toFixed(4)}</td>
-                        <td className="p-4 text-sm font-bold text-gray-400 text-right">{(item.current_stock || 0).toFixed(2)} {item.unit}</td>
+                        <td className="p-4 text-sm font-bold text-gray-400 text-right">{(item.current_stock || 0).toFixed(2)} {item.usage_unit || item.unit}</td>
                         <td className="p-4 text-right">
                           <div className="flex justify-end items-center gap-2">
                             <input 
@@ -253,7 +253,7 @@ export default function StockOpeningClosing() {
                               className={`w-24 text-right px-3 py-1.5 border rounded-lg outline-none font-bold text-sm focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue
                                 ${isDiff ? 'border-yellow-300 bg-yellow-50 text-yellow-900' : 'border-gray-200 bg-gray-50 text-gray-800'}`}
                             />
-                            <span className="text-xs text-gray-500 font-medium w-6 text-left">{item.unit}</span>
+                            <span className="text-xs text-gray-500 font-medium w-6 text-left">{item.usage_unit || item.unit}</span>
                           </div>
                         </td>
                         <td className="p-4 pr-6 text-sm font-black text-hcdc-blue text-right">₱{val.toFixed(2)}</td>

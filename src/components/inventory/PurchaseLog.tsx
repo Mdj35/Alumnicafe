@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getPurchases, Purchase, logPurchase, getInventoryItems, InventoryItem } from '../../inventoryManager';
-import { Plus, ShoppingBag, Package } from 'lucide-react';
+import { getPurchases, Purchase, logPurchase, getInventoryItems, InventoryItem, clearPurchaseHistory } from '../../inventoryManager';
+import { Plus, ShoppingBag, Package, Trash2 } from 'lucide-react';
 
 export default function PurchaseLog() {
   const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -44,8 +44,17 @@ export default function PurchaseLog() {
     });
   };
 
+  const handleClearHistory = async () => {
+    if (!confirm("Are you sure you want to clear ALL purchase history? This action cannot be undone.")) return;
+    
+    await clearPurchaseHistory();
+    await loadData();
+    alert("Purchase history cleared.");
+  };
+
   const getItemName = (id: string) => items.find(i => i.id === id)?.item_name || 'Unknown Item';
-  const getUnit = (id: string) => items.find(i => i.id === id)?.unit || '';
+  const getUsageUnit = (id: string) => { const i = items.find(i => i.id === id); return i?.usage_unit || i?.unit || ''; };
+  const getPurchaseUnit = (id: string) => items.find(i => i.id === id)?.purchase_unit || 'Pack';
 
   const totalPurchaseValue = purchases.reduce((sum, p) => sum + p.total_cost, 0);
 
@@ -63,6 +72,9 @@ export default function PurchaseLog() {
           </div>
           <button onClick={() => setShowModal(true)} className="bg-hcdc-blue text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-hcdc-blue-dark transition-colors shadow-md">
             <Plus className="w-4 h-4" /> Record Purchase
+          </button>
+          <button onClick={handleClearHistory} className="bg-red-50 text-red-600 px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-red-100 transition-colors shadow-sm border border-red-100">
+            <Trash2 className="w-4 h-4" /> Clear History
           </button>
         </div>
       </div>
@@ -84,16 +96,17 @@ export default function PurchaseLog() {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {purchases.map(p => {
-              const unit = getUnit(p.item_id);
+              const usageUnit = getUsageUnit(p.item_id);
+              const purchaseUnit = getPurchaseUnit(p.item_id);
               return (
                 <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="p-4 pl-6 text-sm font-bold text-gray-700">{p.purchase_date}</td>
                   <td className="p-4 font-bold text-gray-800">{getItemName(p.item_id)}</td>
                   <td className="p-4 text-sm font-medium text-gray-500">{p.supplier || '-'}</td>
                   
-                  <td className="p-4 text-sm font-medium text-gray-500 text-right">{p.package_quantity || 1} {unit}</td>
-                  <td className="p-4 text-sm font-black text-gray-700 text-right">{p.purchase_qty || p.quantity}</td>
-                  <td className="p-4 text-sm font-bold text-hcdc-blue text-right">{p.quantity} {unit}</td>
+                  <td className="p-4 text-sm font-medium text-gray-500 text-right">{p.package_quantity || 1} {usageUnit} / {purchaseUnit}</td>
+                  <td className="p-4 text-sm font-black text-gray-700 text-right">{p.purchase_qty || (p.quantity / (p.package_quantity || 1))} {purchaseUnit}s</td>
+                  <td className="p-4 text-sm font-bold text-hcdc-blue text-right">{p.quantity} {usageUnit}</td>
                   
                   <td className="p-4 text-sm font-bold text-gray-500 text-right">₱{(p.purchase_price || 0).toFixed(2)}</td>
                   <td className="p-4 text-sm font-bold text-gray-700 text-right border-l border-gray-100 bg-gray-50/50">₱{(p.unit_cost || (p.total_cost / p.quantity) || 0).toFixed(4)}</td>
@@ -156,19 +169,19 @@ export default function PurchaseLog() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Number of Packs Bought</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Quantity Bought ({form.item_id ? getPurchaseUnit(form.item_id) + 's' : 'Purchase Units'})</label>
                   <input required type="number" step="0.01" min="0" value={form.purchase_qty} onChange={e => setForm({...form, purchase_qty: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue outline-none" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Purchase Price (Per Pack)</label>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Purchase Price (Per {form.item_id ? getPurchaseUnit(form.item_id) : 'Unit'})</label>
                   <input required type="number" step="0.01" min="0" value={form.purchase_price} onChange={e => setForm({...form, purchase_price: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue outline-none" />
                 </div>
                 <div className="col-span-2">
                   <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1">
-                    <Package className="w-3 h-3"/> Yield / Quantity per Pack {form.item_id ? `(in ${getUnit(form.item_id)})` : ''}
+                    <Package className="w-3 h-3"/> Conversion Factor (Usage Units per Purchase Unit)
                   </label>
                   <input required type="number" step="0.01" min="0.01" value={form.package_quantity} onChange={e => setForm({...form, package_quantity: parseFloat(e.target.value) || 1})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue outline-none" />
-                  <p className="text-[10px] text-gray-400 mt-1">Updates the item's default package quantity</p>
+                  <p className="text-[10px] text-gray-400 mt-1">1 {form.item_id ? getPurchaseUnit(form.item_id) : 'Purchase Unit'} = {form.package_quantity} {form.item_id ? getUsageUnit(form.item_id) : 'Usage Units'}</p>
                 </div>
               </div>
 
@@ -177,7 +190,7 @@ export default function PurchaseLog() {
                   <p className="text-xs font-bold text-gray-500 uppercase mb-1">New Base Unit Cost</p>
                   <p className="text-sm font-bold text-gray-800">
                     ₱{((form.purchase_price || 0) / (form.package_quantity || 1)).toFixed(4)} 
-                    {form.item_id ? <span className="text-xs text-gray-500 font-normal ml-1">per {getUnit(form.item_id)}</span> : ''}
+                    {form.item_id ? <span className="text-xs text-gray-500 font-normal ml-1">per {getUsageUnit(form.item_id)}</span> : ''}
                   </p>
                 </div>
                 <div className="text-right">

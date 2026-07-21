@@ -22,7 +22,10 @@ export interface InventoryItem {
   item_code: string;
   item_name: string;
   category_id: string;
-  unit: string;
+  description?: string;
+  purchase_unit?: string;
+  usage_unit?: string;
+  unit: string; // legacy usage unit
   supplier?: string;
   purchase_price: number;
   package_quantity: number;
@@ -210,6 +213,15 @@ export async function getPurchases(): Promise<Purchase[]> {
     console.error("Error fetching purchases:", error);
     return [];
   }
+}
+
+export async function clearPurchaseHistory(): Promise<void> {
+  const querySnapshot = await getDocs(collection(db, PURCHASES_COL));
+  const batch = writeBatch(db);
+  querySnapshot.forEach((docSnap) => {
+    batch.delete(docSnap.ref);
+  });
+  await batch.commit();
 }
 
 export async function logPurchase(purchase: Omit<Purchase, 'id' | 'quantity' | 'unit_cost' | 'total_cost'>): Promise<void> {

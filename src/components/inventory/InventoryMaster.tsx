@@ -17,7 +17,7 @@ export default function InventoryMaster() {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState({
-    item_name: '', category_id: '', unit: 'pcs', 
+    item_name: '', category_id: '', unit: 'pcs', purchase_unit: '', usage_unit: '', description: '', package_quantity: 1,
     cost_price: 0, selling_price: 0, opening_stock: 0, minimum_stock: 0, supplier: ''
   });
 
@@ -61,7 +61,11 @@ export default function InventoryMaster() {
     setForm({
       item_name: item.item_name,
       category_id: item.category_id,
-      unit: item.unit,
+      unit: item.usage_unit || item.unit,
+      purchase_unit: item.purchase_unit || '',
+      usage_unit: item.usage_unit || item.unit,
+      description: item.description || '',
+      package_quantity: item.package_quantity || 1,
       cost_price: item.cost_price,
       selling_price: item.selling_price,
       opening_stock: item.opening_stock,
@@ -74,7 +78,7 @@ export default function InventoryMaster() {
   const openAdd = () => {
     setEditingItem(null);
     setForm({
-      item_name: '', category_id: categories[0] || '', unit: 'pcs', 
+      item_name: '', category_id: categories[0] || '', unit: 'pcs', purchase_unit: '', usage_unit: 'pcs', description: '', package_quantity: 1,
       cost_price: 0, selling_price: 0, opening_stock: 0, minimum_stock: 0, supplier: ''
     });
     setShowModal(true);
@@ -126,7 +130,8 @@ export default function InventoryMaster() {
             <tr className="text-[10px] uppercase tracking-widest text-gray-400 font-black">
               <th className="p-4 pl-6">Item Name</th>
               <th className="p-4">Category</th>
-              <th className="p-4">Unit</th>
+              <th className="p-4">Purchase Unit</th>
+              <th className="p-4">Usage Unit</th>
               <th className="p-4 text-right">Cost Price</th>
               <th className="p-4 text-right">Selling Price</th>
               <th className="p-4 text-right">Current Stock</th>
@@ -139,14 +144,20 @@ export default function InventoryMaster() {
               const isLow = item.current_stock <= item.minimum_stock;
               return (
                 <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="p-4 pl-6 font-bold text-gray-800 flex items-center gap-2">
-                    {isLow && <AlertCircle className="w-4 h-4 text-red-500" title="Low Stock!" />}
-                    {item.item_name}
+                  <td className="p-4 pl-6 font-bold text-gray-800">
+                    <div className="flex items-center gap-2">
+                      {isLow && <AlertCircle className="w-4 h-4 text-red-500" title="Low Stock!" />}
+                      <div>
+                        {item.item_name}
+                        {item.description && <div className="text-xs font-normal text-gray-400 mt-0.5">{item.description}</div>}
+                      </div>
+                    </div>
                   </td>
                   <td className="p-4 text-sm font-medium text-gray-500">
                     <span className="bg-gray-100 px-2 py-1 rounded-lg text-xs">{getCatName(item.category_id)}</span>
                   </td>
-                  <td className="p-4 text-sm font-medium text-gray-500">{item.unit}</td>
+                  <td className="p-4 text-sm font-medium text-gray-500">{item.purchase_unit || '-'}</td>
+                  <td className="p-4 text-sm font-medium text-gray-500">{item.usage_unit || item.unit}</td>
                   <td className="p-4 text-sm font-bold text-gray-700 text-right">₱ {(item.cost_price || 0).toFixed(2)}</td>
                   <td className="p-4 text-sm font-bold text-gray-700 text-right">₱ {(item.selling_price || 0).toFixed(2)}</td>
                   <td className={`p-4 text-sm font-black text-right ${isLow ? 'text-red-600' : 'text-hcdc-blue'}`}>
@@ -186,9 +197,22 @@ export default function InventoryMaster() {
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                  <input type="text" placeholder="e.g. Arabica beans for espresso" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                </div>
                 <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase">Unit of Measurement</label>
-                  <input required type="text" placeholder="e.g. pcs, kg, ml" value={form.unit} onChange={e => setForm({...form, unit: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                  <label className="text-xs font-bold text-gray-500 uppercase">Purchase Unit</label>
+                  <input required type="text" placeholder="e.g. Bag, Box, Kilogram" value={form.purchase_unit} onChange={e => setForm({...form, purchase_unit: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Usage Unit (Internal/Recipe)</label>
+                  <input required type="text" placeholder="e.g. Grams, Pcs, ml" value={form.usage_unit} onChange={e => setForm({...form, usage_unit: e.target.value, unit: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Conversion Factor (Usage Units per Purchase Unit)</label>
+                  <input required type="number" step="0.001" min="0.001" value={form.package_quantity} onChange={e => setForm({...form, package_quantity: parseFloat(e.target.value) || 1})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                  <p className="text-[10px] text-gray-400 mt-1">e.g. If Purchase Unit is Bag and Usage Unit is Grams, and 1 Bag = 1000 Grams, enter 1000.</p>
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Supplier (Optional)</label>
