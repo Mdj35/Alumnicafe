@@ -460,6 +460,14 @@ export async function saveOpeningStock(entry: Omit<OpeningStockEntry, 'id'>): Pr
   await batch.commit();
 }
 
+export async function updateOpeningStock(id: string, updates: Partial<Omit<OpeningStockEntry, 'id'>>): Promise<void> {
+  await updateDoc(doc(db, OPENING_STOCK_COL, id), updates);
+}
+
+export async function deleteOpeningStock(id: string): Promise<void> {
+  await deleteDoc(doc(db, OPENING_STOCK_COL, id));
+}
+
 // --- INVENTORY PERIODS (Legacy compat) ---
 export async function getInventoryPeriods(): Promise<InventoryPeriod[]> {
   try {
