@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getMenuItems, MenuItem } from '../../menuStorage';
+import { getMenuItems, MenuItem, updateMenuItem } from '../../menuStorage';
 import { getInventoryItems, getRecipes, saveRecipe, InventoryItem, Recipe, RecipeIngredient } from '../../inventoryManager';
 import { UtensilsCrossed, Plus, X, Save, AlertCircle, Search } from 'lucide-react';
 
@@ -34,16 +34,37 @@ export default function RecipeCosting() {
     if (existing) {
       setEditingRecipe({ ...existing, menu_item_name: item.name, selling_price: item.price });
     } else {
+      // Seed ingredients from the menu item's own ingredient list if available
+      let seededIngredients: RecipeIngredient[] = [];
+      let seededCost = 0;
+
+      if (item.ingredients && item.ingredients.length > 0) {
+        seededIngredients = item.ingredients.map(ing => {
+          const invItem = inventoryItems.find(i => i.id === ing.inventoryId);
+          if (!invItem) return null;
+          const unitCost = invItem.unit_cost || 0;
+          seededCost += unitCost * ing.quantity;
+          return {
+            item_id: invItem.id,
+            item_name: invItem.item_name,
+            quantity: ing.quantity,
+            unit: invItem.unit,
+            unit_cost: unitCost
+          };
+        }).filter(Boolean) as RecipeIngredient[];
+      }
+
+      const cogsPercent = item.price > 0 ? (seededCost / item.price) * 100 : 0;
       setEditingRecipe({
         id: `recipe_${item.id}`,
         menu_item_id: item.id,
         menu_item_name: item.name,
         selling_price: item.price,
-        ingredients: [],
-        recipe_cost: 0,
-        cost_per_serving: 0,
-        food_cost_percentage: 0,
-        gross_profit: 0
+        ingredients: seededIngredients,
+        recipe_cost: seededCost,
+        cost_per_serving: seededCost,
+        food_cost_percentage: cogsPercent,
+        gross_profit: item.price - seededCost
       });
     }
   };
@@ -110,6 +131,14 @@ export default function RecipeCosting() {
   const handleSaveRecipe = async () => {
     if (!editingRecipe) return;
     await saveRecipe(editingRecipe);
+    
+    // Sync back to MenuItem to keep both UI sections perfectly matched
+    const mappedIngredients = editingRecipe.ingredients.map(ing => ({
+      inventoryId: ing.item_id,
+      quantity: ing.quantity
+    }));
+    await updateMenuItem(editingRecipe.menu_item_id, { ingredients: mappedIngredients });
+
     await loadData();
     alert('Recipe saved successfully!');
   };

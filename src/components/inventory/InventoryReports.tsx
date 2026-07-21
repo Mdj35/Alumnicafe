@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getInventoryItems, getPurchases, getInventoryTransactions, InventoryItem, Purchase, InventoryTransaction } from '../../inventoryManager';
+import { getInventoryItems, getPurchases, getInventoryTransactions, getStockCounts, InventoryItem, Purchase, InventoryTransaction, StockCount } from '../../inventoryManager';
 import { getMenuCategories } from '../../menuStorage';
 import { BarChart3, TrendingUp, Package, AlertCircle } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -12,6 +12,7 @@ export default function InventoryReports() {
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [posTxns, setPosTxns] = useState<TransactionRecord[]>([]);
+  const [stockCounts, setStockCounts] = useState<StockCount[]>([]);
   const [activeTab, setActiveTab] = useState<'Overview' | 'Tracker'>('Overview');
 
   useEffect(() => {
@@ -19,14 +20,15 @@ export default function InventoryReports() {
   }, []);
 
   const loadData = async () => {
-    const [_items, _purchases, _txns, _cats, _posTxns] = await Promise.all([
-      getInventoryItems(), getPurchases(), getInventoryTransactions(), getMenuCategories(), getTransactions()
+    const [_items, _purchases, _txns, _cats, _posTxns, _counts] = await Promise.all([
+      getInventoryItems(), getPurchases(), getInventoryTransactions(), getMenuCategories(), getTransactions(), getStockCounts()
     ]);
     setItems(_items);
     setPurchases(_purchases);
     setTransactions(_txns);
     setCategories(_cats);
     setPosTxns(_posTxns);
+    setStockCounts(_counts);
   };
 
   // KPI Calculations
@@ -78,7 +80,7 @@ export default function InventoryReports() {
       </div>
 
       {activeTab === 'Tracker' ? (
-        <PeriodicTracker items={items} purchases={purchases} inventoryTxns={transactions} posTxns={posTxns} categories={categories} />
+        <PeriodicTracker items={items} purchases={purchases} inventoryTxns={transactions} posTxns={posTxns} categories={categories} stockCounts={stockCounts} />
       ) : (
         <>
           {/* Overview Tab Content */}

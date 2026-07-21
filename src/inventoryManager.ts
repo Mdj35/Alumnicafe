@@ -509,15 +509,29 @@ export async function resetOpeningStock(): Promise<void> {
     start_date = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   }
 
-  const periodItems: InventoryPeriodItem[] = items.map(item => ({
-    item_id: item.id,
-    item_name: item.item_name,
-    category_id: item.category_id,
-    unit: item.unit,
-    cost_price: item.unit_cost,
-    opening_stock: item.opening_stock,
-    closing_stock: item.current_stock
-  }));
+  // Fetch all stock counts to find the most recent actual physical count per item
+  const allCounts = await getStockCounts();
+
+  const periodItems: InventoryPeriodItem[] = items.map(item => {
+    // Find the most recent stock count for this item (ordered desc by count_date)
+    const itemCounts = allCounts
+      .filter(c => c.item_id === item.id)
+      .sort((a, b) => b.count_date.localeCompare(a.count_date));
+
+    // Only use an actual counted value; never use current_stock as a proxy
+    const latestCount = itemCounts[0];
+    const closingStock = latestCount != null ? latestCount.actual_quantity : null;
+
+    return {
+      item_id: item.id,
+      item_name: item.item_name,
+      category_id: item.category_id,
+      unit: item.unit,
+      cost_price: item.unit_cost,
+      opening_stock: item.opening_stock,
+      closing_stock: closingStock as unknown as number  // null means not yet counted
+    };
+  });
 
   const periodId = `period_${Date.now()}`;
   
@@ -547,3 +561,4 @@ export async function resetOpeningStock(): Promise<void> {
 
   await batch.commit();
 }
+

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { InventoryItem, Purchase, InventoryTransaction } from '../../inventoryManager';
+import { InventoryItem, Purchase, InventoryTransaction, StockCount } from '../../inventoryManager';
 import { TransactionRecord } from '../../transactions';
 
 interface PeriodicTrackerProps {
@@ -8,6 +8,7 @@ interface PeriodicTrackerProps {
   inventoryTxns: InventoryTransaction[];
   posTxns: TransactionRecord[];
   categories: string[];
+  stockCounts: StockCount[];
 }
 
 interface Period {
@@ -16,7 +17,7 @@ interface Period {
   end_date: Date;
 }
 
-export default function PeriodicTracker({ items, purchases, inventoryTxns, posTxns, categories }: PeriodicTrackerProps) {
+export default function PeriodicTracker({ items, purchases, inventoryTxns, posTxns, categories, stockCounts }: PeriodicTrackerProps) {
   const [interval, setInterval] = useState<'Daily' | 'Weekly'>('Weekly');
   const [targetMargin, setTargetMargin] = useState<number>(72);
   const [staffMeal, setStaffMeal] = useState<number>(20);
@@ -58,24 +59,56 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
     return p;
   }, [interval]);
 
-  // Helper to calculate closing stock value at a given Date
-  const getClosingStockValue = (date: Date, categoryFilter?: string) => {
+  // Helper: get the closing stock value at a given date using ACTUAL stock counts.
+  // For each item, find the most recent stock count on or before `date`.
+  // If no count exists, that item's value is treated as unknown (null).
+  // Returns { value: number, isEstimated: boolean } where isEstimated=true means
+  // at least one item had no count and was skipped.
+  const getClosingStockData = (date: Date, categoryFilter?: string): { value: number; isEstimated: boolean; uncountedItemCount: number } => {
     let totalValue = 0;
-    
+    let uncountedCount = 0;
+    const dateStr = date.toISOString().slice(0, 10);
+
     for (const item of items) {
       if (categoryFilter && item.category_id !== categoryFilter) continue;
-      
+
+      // Find the most recent stock count for this item on or before `date`
+      const relevantCounts = stockCounts
+        .filter(c => c.item_id === item.id && c.count_date <= dateStr)
+        .sort((a, b) => b.count_date.localeCompare(a.count_date));
+
+      if (relevantCounts.length > 0) {
+        const actualQty = relevantCounts[0].actual_quantity;
+        totalValue += actualQty * (item.cost_price || 0);
+      } else {
+        // No stock count recorded for this item in this period — skip it and flag
+        uncountedCount++;
+      }
+    }
+
+    const relevantItems = categoryFilter
+      ? items.filter(i => i.category_id === categoryFilter)
+      : items;
+
+    return {
+      value: totalValue,
+      isEstimated: uncountedCount > 0,
+      uncountedItemCount: uncountedCount
+    };
+  };
+
+  // Legacy helper kept for internal rollback computation only (not shown as Closing Stock)
+  const getSystemStockValue = (date: Date, categoryFilter?: string) => {
+    let totalValue = 0;
+    for (const item of items) {
+      if (categoryFilter && item.category_id !== categoryFilter) continue;
       let stock = item.current_stock;
-      
-      // Rollback txns that happened AFTER the date
       const futureTxns = inventoryTxns.filter(t => t.item_id === item.id && new Date(t.date).getTime() > date.getTime());
-      
       for (const txn of futureTxns) {
         if (txn.transaction_type === 'Purchase') stock -= txn.quantity;
         if (txn.transaction_type === 'Used') stock += txn.quantity;
         if (txn.transaction_type === 'Adjustment') stock -= txn.quantity;
       }
-      
       totalValue += (stock * item.cost_price);
     }
     return totalValue;
@@ -84,18 +117,28 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
   // Calculate Data Table
   const reportData = useMemo(() => {
     return periods.map(period => {
-      // 1. Categories Closing
-      const categoryClosing: Record<string, number> = {};
+      // 1. Categories Closing — use actual stock counts
+      const categoryClosing: Record<string, number | null> = {};
+      const categoryIsEstimated: Record<string, boolean> = {};
       categories.forEach(cat => {
-        categoryClosing[cat] = getClosingStockValue(period.end_date, cat);
+        const data = getClosingStockData(period.end_date, cat);
+        categoryClosing[cat] = data.uncountedItemCount === items.filter(i => i.category_id === cat).length
+          ? null  // ALL items in category uncounted → null
+          : data.value;
+        categoryIsEstimated[cat] = data.isEstimated;
       });
 
       // 2. Financials
-      // The opening of this period is the closing of the previous period.
-      // To get exact opening, we calculate closing at (start_date - 1ms)
+      // Opening: use system rollback (opening doesn't need a count — it's a past period's closing)
       const openingDate = new Date(period.start_date.getTime() - 1);
-      const openingInventory = getClosingStockValue(openingDate);
-      const closingInventory = getClosingStockValue(period.end_date);
+      const openingInventory = getSystemStockValue(openingDate);
+
+      // Closing: only from actual stock counts
+      const closingData = getClosingStockData(period.end_date);
+      const closingInventory = closingData.uncountedItemCount === items.length
+        ? null  // nothing counted at all
+        : closingData.value;
+      const closingIsEstimated = closingData.isEstimated;
 
       const periodPurchases = purchases
         .filter(p => {
@@ -104,7 +147,10 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
         })
         .reduce((sum, p) => sum + p.total_cost, 0);
 
-      const cogs = openingInventory + periodPurchases - closingInventory - staffMeal;
+      // COGS only computable when we have at least some closing counts
+      const cogs = closingInventory != null
+        ? openingInventory + periodPurchases - closingInventory - staffMeal
+        : null;
 
       const grossReceipts = posTxns
         .filter(t => {
@@ -115,20 +161,21 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
         .reduce((sum, t) => sum + t.total, 0);
 
       const netReceipts = grossReceipts / 1.12;
-      const grossProfit = netReceipts - cogs;
-      const grossProfitMargin = netReceipts > 0 ? (grossProfit / netReceipts) * 100 : 0;
+      const grossProfit = cogs != null ? netReceipts - cogs : null;
+      const grossProfitMargin = (cogs != null && netReceipts > 0) ? ((netReceipts - cogs) / netReceipts) * 100 : null;
       
-      const variance = grossProfitMargin - targetMargin;
-      
+      const variance = grossProfitMargin != null ? grossProfitMargin - targetMargin : null;
       const targetCogs = netReceipts * (1 - (targetMargin / 100));
-      const costVariance = targetCogs - cogs;
+      const costVariance = cogs != null ? targetCogs - cogs : null;
 
       return {
         ...period,
         categoryClosing,
+        categoryIsEstimated,
         openingInventory,
         purchases: periodPurchases,
         closingInventory,
+        closingIsEstimated,
         cogs,
         grossReceipts,
         netReceipts,
@@ -138,15 +185,17 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
         costVariance
       };
     });
-  }, [periods, items, purchases, inventoryTxns, posTxns, categories, targetMargin, staffMeal]);
+  }, [periods, items, purchases, inventoryTxns, posTxns, categories, targetMargin, staffMeal, stockCounts]);
 
 
-  const formatNum = (num: number, isPercent = false) => {
+  const formatNum = (num: number | null, isPercent = false) => {
+    if (num == null) return <span className="text-[10px] font-black text-amber-500">Not Counted</span>;
     if (num === 0 && !isPercent) return '-';
     return (isPercent ? num.toFixed(2) + ' %' : num.toFixed(2));
   };
 
-  const renderVariance = (num: number, isPercent = false) => {
+  const renderVariance = (num: number | null, isPercent = false) => {
+    if (num == null) return <span className="text-gray-400">—</span>;
     const formatted = Math.abs(num).toFixed(2) + (isPercent ? ' %' : '');
     if (num < -0.005) return <span className="text-red-500">{formatted} -</span>;
     if (num > 0.005) return <span className="text-green-600">{formatted} +</span>;
@@ -215,7 +264,12 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
                 <td className="p-3 pl-6 text-xs font-bold text-gray-700 uppercase">{cat}</td>
                 {reportData.map(col => (
                   <td key={col.label + cat} className="p-3 text-sm text-gray-800 text-right font-medium">
-                    {formatNum(col.categoryClosing[cat])}
+                    {col.categoryClosing[cat] == null
+                      ? <span className="text-[10px] font-black text-amber-500">Not Counted</span>
+                      : col.categoryIsEstimated[cat]
+                        ? <span title="Partial count">{formatNum(col.categoryClosing[cat] as number)} <span className="text-amber-400">~</span></span>
+                        : formatNum(col.categoryClosing[cat] as number)
+                    }
                   </td>
                 ))}
                 <td className="bg-[#D1D1D1]"></td>
@@ -237,7 +291,17 @@ export default function PeriodicTracker({ items, purchases, inventoryTxns, posTx
             </tr>
             <tr>
               <td className="p-3 pl-6 text-xs font-bold text-gray-700 uppercase">Cost of Inventory at Closing</td>
-              {reportData.map(col => <td key={col.label} className="p-3 text-sm text-gray-800 text-right font-medium">{formatNum(col.closingInventory)}</td>)}
+              {reportData.map(col => (
+                <td key={col.label} className="p-3 text-sm text-gray-800 text-right font-medium">
+                  {col.closingInventory == null
+                    ? <span className="text-[10px] font-black text-amber-500">Not Counted</span>
+                    : <span>
+                        {formatNum(col.closingInventory as number)}
+                        {col.closingIsEstimated && <span className="text-amber-400 ml-1" title="Partial count">~</span>}
+                      </span>
+                  }
+                </td>
+              ))}
               <td className="bg-[#D1D1D1]"></td>
             </tr>
             <tr>

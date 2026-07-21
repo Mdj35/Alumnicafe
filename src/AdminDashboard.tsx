@@ -46,7 +46,7 @@ import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuIte
 import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
 import { getCashiers, addCashier, updateCashier, deleteCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
 import { getCashCounts, CashCountRecord } from './cashCountStorage';
-import { getInventoryItems, InventoryItem, deleteInventoryItem } from './inventoryManager';
+import { getInventoryItems, InventoryItem, deleteInventoryItem, saveRecipe, deleteRecipe, Recipe } from './inventoryManager';
 import InventoryDashboard from './components/inventory/InventoryDashboard';
 
 // Legacy dummy implementations to satisfy unused inventory handlers
@@ -317,6 +317,44 @@ export default function AdminDashboard() {
     reader.readAsDataURL(file);
   };
 
+  const syncRecipeForMenuItem = async (item: MenuItem, currentInventory: InventoryItem[]) => {
+    const recipeId = `recipe_${item.id}`;
+    let recipeCost = 0;
+    
+    const recipeIngredients = (item.ingredients || []).map(ing => {
+      const invItem = currentInventory.find(i => i.id === ing.inventoryId);
+      if (!invItem) return null;
+      const unitCost = invItem.unit_cost || 0;  // fix: was cost_per_unit
+      const totalCost = unitCost * ing.quantity;
+      recipeCost += totalCost;
+      return {
+        item_id: invItem.id,
+        item_name: invItem.item_name,  // fix: was invItem.name
+        quantity: ing.quantity,
+        unit: invItem.unit,
+        unit_cost: unitCost,
+        total_cost: totalCost
+      };
+    }).filter(Boolean) as any[];
+
+    const cogsPercent = item.price > 0 ? (recipeCost / item.price) * 100 : 0;
+    const grossProfit = item.price - recipeCost;
+
+    const recipe: Recipe = {
+      id: recipeId,
+      menu_item_id: item.id,
+      menu_item_name: item.name,
+      selling_price: item.price,
+      ingredients: recipeIngredients,
+      recipe_cost: recipeCost,
+      cost_per_serving: recipeCost,
+      food_cost_percentage: cogsPercent,
+      gross_profit: grossProfit
+    };
+    
+    await saveRecipe(recipe);
+  };
+
   const handleAddItem = async () => {
     if (!formData.name || !formData.price) return;
     const updated = await addMenuItem({
@@ -328,6 +366,12 @@ export default function AdminDashboard() {
       ingredients: formData.ingredients
     });
     setMenuItems(updated);
+    
+    const newItem = updated.find(i => i.name === formData.name);
+    if (newItem) {
+      await syncRecipeForMenuItem(newItem, inventory);
+    }
+
     setFormData({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [] });
     setShowAddModal(false);
   };
@@ -343,6 +387,12 @@ export default function AdminDashboard() {
       ingredients: formData.ingredients
     });
     setMenuItems(updated);
+    
+    const editedItem = updated.find(i => i.id === editingItem.id);
+    if (editedItem) {
+      await syncRecipeForMenuItem(editedItem, inventory);
+    }
+
     setEditingItem(null);
     setFormData({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [] });
   };
@@ -357,6 +407,7 @@ export default function AdminDashboard() {
     if (itemToDelete.type === 'menu') {
       const updated = await deleteMenuItem(itemToDelete.id as number);
       setMenuItems(updated);
+      await deleteRecipe(`recipe_${itemToDelete.id}`);
     } else if (itemToDelete.type === 'cashier') {
       setCashiers(await deleteCashier(itemToDelete.id as number));
     } else if (itemToDelete.type === 'inventory') {
