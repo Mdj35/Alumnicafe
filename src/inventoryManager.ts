@@ -284,6 +284,23 @@ export async function clearIngredientUsage(): Promise<void> {
   }
 }
 
+export async function clearAllInventoryTransactions(): Promise<void> {
+  const querySnapshot = await getDocs(collection(db, TXNS_COL));
+  let batch = writeBatch(db);
+  let count = 0;
+  for (const docSnap of querySnapshot.docs) {
+    batch.delete(docSnap.ref);
+    count++;
+    if (count % 400 === 0) {
+      await batch.commit();
+      batch = writeBatch(db);
+    }
+  }
+  if (count % 400 !== 0) {
+    await batch.commit();
+  }
+}
+
 
 export async function logPurchase(purchase: Omit<Purchase, 'id' | 'quantity' | 'unit_cost' | 'total_cost'>): Promise<void> {
   const id = `purch_${Date.now()}`;

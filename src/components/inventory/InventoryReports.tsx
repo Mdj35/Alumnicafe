@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { getInventoryItems, getPurchases, getInventoryTransactions, getStockCounts, InventoryItem, Purchase, InventoryTransaction, StockCount } from '../../inventoryManager';
+import { getInventoryItems, getPurchases, getInventoryTransactions, getStockCounts, clearPurchaseHistory, clearIngredientUsage, clearAllInventoryTransactions, InventoryItem, Purchase, InventoryTransaction, StockCount } from '../../inventoryManager';
 import { getMenuCategories } from '../../menuStorage';
-import { BarChart3, TrendingUp, Package, AlertCircle } from 'lucide-react';
+import { BarChart3, TrendingUp, Package, AlertCircle, Trash2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getTransactions, TransactionRecord } from '../../transactions';
 import PeriodicTracker from './PeriodicTracker';
@@ -14,6 +14,23 @@ export default function InventoryReports() {
   const [posTxns, setPosTxns] = useState<TransactionRecord[]>([]);
   const [stockCounts, setStockCounts] = useState<StockCount[]>([]);
   const [activeTab, setActiveTab] = useState<'Overview' | 'Tracker'>('Overview');
+  const [isCleaning, setIsCleaning] = useState(false);
+
+  const handleClearPurchases = async () => {
+    if (!confirm('Are you sure you want to clear ALL purchase history? This cannot be undone.')) return;
+    setIsCleaning(true);
+    await clearPurchaseHistory();
+    await loadData();
+    setIsCleaning(false);
+  };
+
+  const handleClearMovement = async () => {
+    if (!confirm('Are you sure you want to clear ALL inventory movement trend data? This cannot be undone.')) return;
+    setIsCleaning(true);
+    await clearAllInventoryTransactions();
+    await loadData();
+    setIsCleaning(false);
+  };
 
   useEffect(() => {
     loadData();
@@ -113,8 +130,18 @@ export default function InventoryReports() {
               </div>
             </div>
             <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6" />
+              <div className="flex justify-between items-start">
+                <div className="w-12 h-12 rounded-2xl bg-green-50 text-green-600 flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <button
+                  onClick={handleClearPurchases}
+                  disabled={isCleaning || purchases.length === 0}
+                  title="Clear all purchase history"
+                  className="p-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
               <div>
                 <h3 className="text-3xl font-black text-gray-800">₱ {totalPurchasesValue.toLocaleString('en-PH', {minimumFractionDigits: 2})}</h3>
@@ -125,9 +152,19 @@ export default function InventoryReports() {
 
           <div className="grid grid-cols-3 gap-6">
             <div className="col-span-2 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-              <div className="mb-8">
-                <h3 className="text-lg font-black text-gray-800">Inventory Movement Trend</h3>
-                <p className="text-xs text-gray-500 font-medium">Purchases vs Usage value over time</p>
+              <div className="flex justify-between items-start mb-8">
+                <div>
+                  <h3 className="text-lg font-black text-gray-800">Inventory Movement Trend</h3>
+                  <p className="text-xs text-gray-500 font-medium">Purchases vs Usage value over time</p>
+                </div>
+                <button
+                  onClick={handleClearMovement}
+                  disabled={isCleaning || transactions.length === 0}
+                  title="Clear all movement data"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Clear Data
+                </button>
               </div>
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">

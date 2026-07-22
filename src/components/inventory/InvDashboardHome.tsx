@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getInventoryItems, getPurchases, getInventoryTransactions, InventoryItem, Purchase, InventoryTransaction } from '../../inventoryManager';
+import { getInventoryItems, getPurchases, getInventoryTransactions, clearAllInventoryTransactions, InventoryItem, Purchase, InventoryTransaction } from '../../inventoryManager';
 import { getTransactions, TransactionRecord } from '../../transactions';
-import { Package, TrendingUp, AlertCircle, DollarSign, Activity, ChevronRight } from 'lucide-react';
+import { Package, TrendingUp, AlertCircle, DollarSign, Activity, ChevronRight, Trash2 } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export default function InvDashboardHome({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
@@ -9,6 +9,15 @@ export default function InvDashboardHome({ setActiveTab }: { setActiveTab: (tab:
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [txns, setTxns] = useState<InventoryTransaction[]>([]);
   const [posTxns, setPosTxns] = useState<TransactionRecord[]>([]);
+  const [isCleaning, setIsCleaning] = useState(false);
+
+  const handleClearMovement = async () => {
+    if (!confirm('Are you sure you want to clear ALL inventory movement trend data? This cannot be undone.')) return;
+    setIsCleaning(true);
+    await clearAllInventoryTransactions();
+    await loadData();
+    setIsCleaning(false);
+  };
 
   useEffect(() => {
     loadData();
@@ -152,14 +161,24 @@ export default function InvDashboardHome({ setActiveTab }: { setActiveTab: (tab:
       <div className="grid grid-cols-3 gap-6">
         {/* Chart Section */}
         <div className="col-span-2 bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <div className="flex justify-between items-end mb-8">
+          <div className="flex justify-between items-center mb-8">
             <div>
               <h3 className="text-lg font-black text-gray-800">Inventory Movement Trend</h3>
               <p className="text-xs text-gray-500 font-medium">Purchases vs Usage value over last 14 days</p>
             </div>
-            <button onClick={() => setActiveTab('reports')} className="text-xs font-bold text-hcdc-blue hover:underline flex items-center">
-              View Full Reports <ChevronRight className="w-3 h-3 ml-1" />
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleClearMovement}
+                disabled={isCleaning || txns.length === 0}
+                title="Clear all movement trend data"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Clear Data
+              </button>
+              <button onClick={() => setActiveTab('reports')} className="text-xs font-bold text-hcdc-blue hover:underline flex items-center">
+                View Full Reports <ChevronRight className="w-3 h-3 ml-1" />
+              </button>
+            </div>
           </div>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">

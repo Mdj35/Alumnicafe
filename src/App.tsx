@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { saveTransaction, updateCashierNames } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
-import { getInventoryItems, InventoryItem, deductIngredientsByRecipe, getRecipes, Recipe } from './inventoryManager';
+import { getInventoryItems, InventoryItem, deductIngredientsByRecipe, getRecipes, Recipe, getOpeningStocks } from './inventoryManager';
 import { saveCashCount, getCashCounts, CashCountRecord } from './cashCountStorage';
 import { useLoading } from './context/LoadingContext';
 import ButtonLoader from './components/ui/ButtonLoader';
@@ -55,6 +55,63 @@ interface CartItem extends Product {
 type DiscountType = 'REGULAR' | 'PWD' | 'SENIOR' | 'ALUMNI';
 
 const VAT_RATE = 0.12;
+
+const getProductIngredients = (product: Product, recipes: Recipe[]) => {
+  if (product.ingredients?.length) {
+    return product.ingredients.map((ing) => ({
+      item_id: ing.inventoryId,
+      quantity: Number(ing.quantity ?? 0)
+    }));
+  }
+
+  const recipe = recipes.find((r) => r.menu_item_id === product.id);
+  if (!recipe?.ingredients?.length) return [];
+
+  return recipe.ingredients.map((ing) => ({
+    item_id: ing.item_id,
+    quantity: Number(ing.quantity ?? 0)
+  }));
+};
+
+const calculateRecipeServings = (
+  product: Product,
+  inventory: InventoryItem[],
+  recipes: Recipe[],
+  usedInventory: Record<string, number> = {},
+  hasOpeningStockToday: boolean = true
+) => {
+  const ingredients = getProductIngredients(product, recipes);
+  if (!ingredients.length) return Infinity;
+
+  let minServings = Infinity;
+
+  ingredients.forEach((ing) => {
+    const requiredQty = Number(ing.quantity ?? 0);
+    if (!Number.isFinite(requiredQty) || requiredQty <= 0) {
+      minServings = 0;
+      return;
+    }
+
+    const stockBase = localStorage.getItem('pos_stock_base') || 'opening';
+    const stockItem = inventory.find((item) => item.id === ing.item_id);
+    let stockQty = 0;
+    if (stockItem) {
+      if (stockBase === 'opening') {
+        stockQty = hasOpeningStockToday ? Number(stockItem.opening_stock ?? 0) : 0;
+      } else {
+        stockQty = Number(stockItem.current_stock ?? 0);
+      }
+    }
+    const available = Math.max(0, stockQty - (usedInventory[ing.item_id] || 0));
+    const servings = Math.floor(available / requiredQty);
+
+    if (servings < minServings) {
+      minServings = servings;
+    }
+  });
+
+  return minServings;
+};
 
 export default function App() {
   const navigate = useNavigate();
@@ -161,6 +218,7 @@ export default function App() {
   const [categories, setCategories] = useState<string[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [hasOpeningStockToday, setHasOpeningStockToday] = useState(true);
 
   const [newProduct, setNewProduct] = useState({ name: '', price: 0, category: 'Coffee', icon: '☕' });
 
@@ -189,17 +247,22 @@ export default function App() {
   useEffect(() => {
     let isMounted = true;
     const loadData = async () => {
-      const [p, c, i, r] = await Promise.all([
+      const [p, c, i, r, o] = await Promise.all([
         getMenuItems(),
         getMenuCategories(),
         getInventoryItems(),
-        getRecipes()
+        getRecipes(),
+        getOpeningStocks()
       ]);
       if (isMounted) {
         setProducts(p);
         setCategories(c);
         setInventory(i);
         setRecipes(r);
+        
+        const today = new Date().toISOString().slice(0, 10);
+        const hasToday = o.some(entry => entry.date.startsWith(today));
+        setHasOpeningStockToday(hasToday);
       }
     };
     // Initial load with loader
@@ -281,29 +344,21 @@ export default function App() {
   // --- Handlers ---
   const usedInventory = useMemo(() => {
     const usage: Record<string, number> = {};
-    cart.forEach(item => {
-      const recipe = recipes.find(r => r.menu_item_id === item.id);
-      if (recipe && recipe.ingredients) {
-        recipe.ingredients.forEach(ing => {
-          usage[ing.item_id] = (usage[ing.item_id] || 0) + (ing.quantity * item.quantity);
-        });
-      }
+    cart.forEach((item) => {
+      const ingredients = getProductIngredients(item, recipes);
+      ingredients.forEach((ing) => {
+        usage[ing.item_id] = (usage[ing.item_id] || 0) + (ing.quantity * item.quantity);
+      });
     });
     return usage;
   }, [cart, recipes]);
 
   const canAddProduct = (product: Product, deltaQty: number) => {
-    const recipe = recipes.find(r => r.menu_item_id === product.id);
-    if (!recipe || !recipe.ingredients || recipe.ingredients.length === 0) return true;
-    
-    for (const ing of recipe.ingredients) {
-      const required = ing.quantity * deltaQty;
-      const alreadyUsed = usedInventory[ing.item_id] || 0;
-      const stockItem = inventory.find(i => i.id === ing.item_id);
-      const stockQty = stockItem ? stockItem.current_stock : 0;
-      if (alreadyUsed + required > stockQty) return false;
-    }
-    return true;
+    const ingredients = getProductIngredients(product, recipes);
+    if (!ingredients.length) return true;
+
+    const availableServings = calculateRecipeServings(product, inventory, recipes, usedInventory, hasOpeningStockToday);
+    return availableServings >= deltaQty;
   };
 
   const addToCart = (product: Product) => {
@@ -605,18 +660,11 @@ export default function App() {
                 let minServings = Infinity;
                 let hasInventoryTracking = false;
 
-                const recipe = recipes.find(r => r.menu_item_id === product.id);
+                const ingredients = getProductIngredients(product, recipes);
 
-                if (recipe && recipe.ingredients && recipe.ingredients.length > 0) {
+                if (ingredients.length > 0) {
                   hasInventoryTracking = true;
-                  recipe.ingredients.forEach(ing => {
-                    const stockItem = inventory.find(i => i.id === ing.item_id);
-                    const stockQty = stockItem ? stockItem.current_stock : 0;
-                    const used = usedInventory[ing.item_id] || 0;
-                    const avail = Math.max(0, stockQty - used);
-                    const servings = Math.floor(avail / ing.quantity);
-                    if (servings < minServings) minServings = servings;
-                  });
+                  minServings = calculateRecipeServings(product, inventory, recipes, usedInventory, hasOpeningStockToday);
                 }
 
                 const isOut = hasInventoryTracking && minServings <= 0;
@@ -638,7 +686,7 @@ export default function App() {
                         )}
                         {hasInventoryTracking && (
                           <div className={`absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 ${isOut ? 'bg-red-500 text-white' : 'bg-hcdc-blue/90 text-white backdrop-blur-sm'}`}>
-                            {isOut ? 'Sold Out' : isFinite(minServings) ? `${minServings} left` : ''}
+                            {isOut ? 'No Stock' : isFinite(minServings) ? `${minServings} left` : ''}
                           </div>
                         )}
                       </div>

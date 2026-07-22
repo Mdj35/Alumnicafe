@@ -28,7 +28,8 @@ import {
   Receipt,
   Tag,
   Package,
-  Minus
+  Minus,
+  Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import cafeLogo from './CAFE.jpg';
@@ -65,7 +66,7 @@ export default function AdminDashboard() {
     }
   }, [navigate]);
 
-  const [activeTab, setActiveTab] = useState<'analytics' | 'cashiers' | 'reports' | 'menu' | 'inventory'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'cashiers' | 'reports' | 'menu' | 'inventory' | 'settings'>('analytics');
   const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'specific' | 'range'>('weekly');
   const [analyticsSpecificDate, setAnalyticsSpecificDate] = useState('');
   const [analyticsSpecificDateEnd, setAnalyticsSpecificDateEnd] = useState('');
@@ -135,6 +136,16 @@ export default function AdminDashboard() {
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
   const [editTxnForm, setEditTxnForm] = useState({ total: 0, subtotal: 0, discountAmount: 0, vatAmount: 0, items: [] as any[] });
   const VAT_RATE = 0.12;
+
+  // Settings state
+  const [posStockBase, setPosStockBase] = useState<'opening' | 'current'>(
+    (localStorage.getItem('pos_stock_base') as 'opening' | 'current') || 'opening'
+  );
+
+  const handleStockBaseChange = (base: 'opening' | 'current') => {
+    setPosStockBase(base);
+    localStorage.setItem('pos_stock_base', base);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -1164,6 +1175,13 @@ export default function AdminDashboard() {
               >
                 <Package className="w-4 h-4" /> Inventory
               </button>
+              <button
+                onClick={() => setActiveTab('settings')}
+                className={`flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl font-bold text-xs md:text-sm transition-all ${activeTab === 'settings' ? 'bg-hcdc-blue text-white shadow-md' : 'text-gray-500 hover:text-hcdc-blue hover:bg-hcdc-light-blue'
+                  }`}
+              >
+                <Settings className="w-4 h-4" /> Settings
+              </button>
             </div>
           </div>
         </div>
@@ -1706,6 +1724,55 @@ export default function AdminDashboard() {
           {activeTab === 'inventory' && (
             <div className="h-full">
               <InventoryDashboard />
+            </div>
+          )}
+
+          {/* --- SETTINGS TAB --- */}
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              <div className="bg-white rounded-3xl p-6 md:p-8 border border-gray-100 shadow-sm">
+                <div className="mb-6">
+                  <h3 className="text-xl font-black text-gray-800">POS Settings</h3>
+                  <p className="text-sm text-gray-500 font-medium mt-1">Configure how the POS terminal operates.</p>
+                </div>
+                
+                <div className="space-y-6">
+                  {/* Stock Base Setting */}
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center p-5 bg-gray-50/50 rounded-2xl border border-gray-100 gap-4">
+                    <div>
+                      <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-hcdc-blue" />
+                        Available Stock Calculation Base
+                      </h4>
+                      <p className="text-xs text-gray-500 font-medium mt-1 max-w-md">
+                        Choose whether the POS terminal calculates remaining servings based on the opening stock of the day or the live current stock.
+                      </p>
+                    </div>
+                    <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 shrink-0">
+                      <button
+                        onClick={() => handleStockBaseChange('opening')}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          posStockBase === 'opening' 
+                            ? 'bg-hcdc-blue text-white shadow-md' 
+                            : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        Opening Stock
+                      </button>
+                      <button
+                        onClick={() => handleStockBaseChange('current')}
+                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
+                          posStockBase === 'current' 
+                            ? 'bg-hcdc-blue text-white shadow-md' 
+                            : 'text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        Current Stock
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
