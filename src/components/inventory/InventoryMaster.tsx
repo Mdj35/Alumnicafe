@@ -17,7 +17,7 @@ export default function InventoryMaster() {
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [form, setForm] = useState({
-    item_name: '', category_id: '', unit: 'pcs', purchase_unit: '', usage_unit: '', description: '', package_quantity: 1,
+    item_name: '', category_id: '', sub_category: '', unit: 'pcs', purchase_unit: '', usage_unit: '', description: '', package_quantity: 1,
     cost_price: 0, selling_price: 0, opening_stock: 0, minimum_stock: 0, supplier: ''
   });
 
@@ -61,6 +61,7 @@ export default function InventoryMaster() {
     setForm({
       item_name: item.item_name,
       category_id: item.category_id,
+      sub_category: item.sub_category || '',
       unit: item.usage_unit || item.unit,
       purchase_unit: item.purchase_unit || '',
       usage_unit: item.usage_unit || item.unit,
@@ -78,7 +79,7 @@ export default function InventoryMaster() {
   const openAdd = () => {
     setEditingItem(null);
     setForm({
-      item_name: '', category_id: categories[0] || '', unit: 'pcs', purchase_unit: '', usage_unit: 'pcs', description: '', package_quantity: 1,
+      item_name: '', category_id: categories[0] || '', sub_category: '', unit: 'pcs', purchase_unit: '', usage_unit: 'pcs', description: '', package_quantity: 1,
       cost_price: 0, selling_price: 0, opening_stock: 0, minimum_stock: 0, supplier: ''
     });
     setShowModal(true);
@@ -197,9 +198,18 @@ export default function InventoryMaster() {
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
-                  <input type="text" placeholder="e.g. Arabica beans for espresso" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Sub-Category</label>
+                  <select value={form.sub_category} onChange={e => setForm({...form, sub_category: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none">
+                    <option value="">None</option>
+                    <option value="Syrup">Syrup</option>
+                    <option value="Dairy">Dairy</option>
+                    <option value="Consumables">Consumables</option>
+                  </select>
+                </div>
+                <div className="md:col-span-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Description (Brands, Specifics)</label>
+                  <input type="text" placeholder="e.g. Brand Name, specific details" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Purchase Unit</label>

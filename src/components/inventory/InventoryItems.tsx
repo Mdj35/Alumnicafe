@@ -5,6 +5,7 @@ import {
   addInventoryItem, updateInventoryItem, deleteInventoryItem 
 } from '../../inventoryManager';
 import { getMenuCategories } from '../../menuStorage';
+import { getCashiers } from '../../cashierStorage';
 
 export default function InventoryItems() {
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -16,8 +17,11 @@ export default function InventoryItems() {
   
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [form, setForm] = useState({
-    item_code: '', item_name: '', category_id: '', unit: 'pcs', purchase_unit: '', usage_unit: '', description: '', supplier: '',
+    item_code: '', item_name: '', category_id: '', sub_category: '', unit: 'pcs', purchase_unit: '', usage_unit: '', description: '', supplier: '',
     purchase_price: 0, package_quantity: 1, selling_price: 0, 
     opening_stock: 0, minimum_stock: 0
   });
@@ -41,9 +45,38 @@ export default function InventoryItems() {
     });
   }, [items, search, categoryFilter, stockFilter]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingItem) {
+      setShowPasswordModal(true);
+      setPasswordInput('');
+      setPasswordError('');
+    } else {
+      executeSave();
+    }
+  };
+
+  const confirmEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cashiers = await getCashiers();
     
+    // Check if the entered password belongs to ANY active admin account
+    const isAdminPasswordValid = cashiers.some(c => 
+      c.role === 'Admin' && 
+      c.isActive !== false && 
+      (c.password === passwordInput || (!c.password && passwordInput === '12345'))
+    );
+
+    if (!isAdminPasswordValid) {
+      setPasswordError('Invalid Admin password');
+      return;
+    }
+    
+    setShowPasswordModal(false);
+    executeSave();
+  };
+
+  const executeSave = async () => {
     // Auto calculate unit_cost for save
     const unit_cost = form.purchase_price / form.package_quantity;
 
@@ -75,6 +108,7 @@ export default function InventoryItems() {
       item_code: item.item_code || '',
       item_name: item.item_name,
       category_id: item.category_id,
+      sub_category: item.sub_category || '',
       unit: item.usage_unit || item.unit,
       purchase_unit: item.purchase_unit || '',
       usage_unit: item.usage_unit || item.unit,
@@ -97,7 +131,7 @@ export default function InventoryItems() {
     
     setForm({
       item_code: newCode,
-      item_name: '', category_id: categories[0] || '', unit: 'pcs', purchase_unit: '', usage_unit: 'pcs', description: '', supplier: '',
+      item_name: '', category_id: categories[0] || '', sub_category: '', unit: 'pcs', purchase_unit: '', usage_unit: 'pcs', description: '', supplier: '',
       purchase_price: 0, package_quantity: 1, selling_price: 0, 
       opening_stock: 0, minimum_stock: 0
     });
@@ -227,9 +261,18 @@ export default function InventoryItems() {
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
-                  <input type="text" placeholder="e.g. Arabica beans for espresso" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Sub-Category</label>
+                  <select value={form.sub_category} onChange={e => setForm({...form, sub_category: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none">
+                    <option value="">None</option>
+                    <option value="Syrup">Syrup</option>
+                    <option value="Dairy">Dairy</option>
+                    <option value="Consumables">Consumables</option>
+                  </select>
+                </div>
+                <div className="md:col-span-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Description (Brands, Specifics)</label>
+                  <input type="text" placeholder="e.g. Brand Name, specific details" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Purchase Unit</label>
@@ -287,6 +330,32 @@ export default function InventoryItems() {
                 <button type="submit" className="px-6 py-2.5 rounded-xl font-bold text-white bg-hcdc-blue hover:bg-hcdc-blue-dark transition-colors shadow-md">
                   {editingItem ? 'Save Changes' : 'Add Item'}
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl p-6 md:p-8 border border-gray-100">
+            <h3 className="text-xl font-black text-gray-800 mb-2">Confirm Edit</h3>
+            <p className="text-sm text-gray-500 mb-6">Please enter your password to save changes.</p>
+            <form onSubmit={confirmEdit} className="space-y-4">
+              <div>
+                <input
+                  type="password"
+                  placeholder="Enter password"
+                  value={passwordInput}
+                  onChange={e => setPasswordInput(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none"
+                  autoFocus
+                />
+                {passwordError && <p className="text-red-500 text-xs mt-2 font-bold">{passwordError}</p>}
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowPasswordModal(false)} className="flex-1 py-2.5 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-colors">Cancel</button>
+                <button type="submit" className="flex-1 py-2.5 rounded-xl font-bold text-white bg-hcdc-blue hover:bg-hcdc-blue-dark transition-colors shadow-md">Confirm</button>
               </div>
             </form>
           </div>

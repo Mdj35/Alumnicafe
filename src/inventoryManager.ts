@@ -22,6 +22,7 @@ export interface InventoryItem {
   item_code: string;
   item_name: string;
   category_id: string;
+  sub_category?: string;
   description?: string;
   purchase_unit?: string;
   usage_unit?: string;
