@@ -666,13 +666,7 @@ export default function App() {
                       ))}
                     </AnimatePresence>
 
-                    {!isOut && (
-                      <div className="absolute top-4 right-4 transition-opacity">
-                        <div className="w-8 h-8 rounded-full bg-hcdc-red text-white flex items-center justify-center">
-                          <Plus className="w-4 h-4" />
-                        </div>
-                      </div>
-                    )}
+                    {/* '+' icon removed as per request */}
                   </motion.div>
                 );
               })}
