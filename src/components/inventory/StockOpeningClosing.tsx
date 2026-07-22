@@ -53,7 +53,7 @@ export default function StockOpeningClosing() {
 
   const handleSave = async () => {
     if (editingEntryId) {
-      if (!confirm("Are you sure you want to update this opening stock record? Note: This will not change current stock levels.")) return;
+      if (!confirm("Are you sure you want to update this opening stock record? This will adjust current stock levels based on the difference.")) return;
       
       const openingItems: OpeningStockItem[] = [];
       let totalVal = 0;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { getInventoryItems, getPurchases, getInventoryTransactions, InventoryItem, Purchase, InventoryTransaction } from '../../inventoryManager';
+import { getInventoryItems, getPurchases, getInventoryTransactions, clearIngredientUsage, InventoryItem, Purchase, InventoryTransaction } from '../../inventoryManager';
 import { getTransactions, TransactionRecord } from '../../transactions';
 import { FileText, Calendar, Filter } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -36,6 +36,13 @@ export default function InventoryReportsNew() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Report");
     XLSX.writeFile(wb, `${filename}.xlsx`);
+  };
+
+  const handleResetUsage = async () => {
+    if (window.confirm("Are you sure you want to reset all ingredient usage history? This action cannot be undone.")) {
+      await clearIngredientUsage();
+      await loadData();
+    }
   };
 
   const renderDailySales = () => {
@@ -113,7 +120,10 @@ export default function InventoryReportsNew() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b flex justify-between items-center">
           <h4 className="font-bold text-gray-800">All Time Ingredient Usage (from Sales)</h4>
-          <button onClick={() => exportExcel(data, 'ingredient_usage')} className="text-xs font-bold text-hcdc-blue hover:underline">Export CSV</button>
+          <div className="flex gap-4">
+            <button onClick={handleResetUsage} className="text-xs font-bold text-red-500 hover:underline">Reset Usage</button>
+            <button onClick={() => exportExcel(data, 'ingredient_usage')} className="text-xs font-bold text-hcdc-blue hover:underline">Export CSV</button>
+          </div>
         </div>
         <table className="w-full text-left">
           <thead className="bg-gray-50 text-[10px] uppercase tracking-widest text-gray-500 font-black">

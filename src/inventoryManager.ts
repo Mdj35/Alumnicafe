@@ -218,12 +218,41 @@ export async function getPurchases(): Promise<Purchase[]> {
 
 export async function clearPurchaseHistory(): Promise<void> {
   const querySnapshot = await getDocs(collection(db, PURCHASES_COL));
-  const batch = writeBatch(db);
-  querySnapshot.forEach((docSnap) => {
+  let batch = writeBatch(db);
+  let count = 0;
+  for (const docSnap of querySnapshot.docs) {
     batch.delete(docSnap.ref);
-  });
-  await batch.commit();
+    count++;
+    if (count % 400 === 0) {
+      await batch.commit();
+      batch = writeBatch(db);
+    }
+  }
+  if (count % 400 !== 0) {
+    await batch.commit();
+  }
 }
+
+export async function clearIngredientUsage(): Promise<void> {
+  const querySnapshot = await getDocs(collection(db, TXNS_COL));
+  let batch = writeBatch(db);
+  let count = 0;
+  for (const docSnap of querySnapshot.docs) {
+    const data = docSnap.data() as InventoryTransaction;
+    if (data.transaction_type === 'Used') {
+      batch.delete(docSnap.ref);
+      count++;
+      if (count % 400 === 0) {
+        await batch.commit();
+        batch = writeBatch(db);
+      }
+    }
+  }
+  if (count % 400 !== 0) {
+    await batch.commit();
+  }
+}
+
 
 export async function logPurchase(purchase: Omit<Purchase, 'id' | 'quantity' | 'unit_cost' | 'total_cost'>): Promise<void> {
   const id = `purch_${Date.now()}`;
@@ -474,7 +503,48 @@ export async function saveOpeningStock(entry: Omit<OpeningStockEntry, 'id'>): Pr
 }
 
 export async function updateOpeningStock(id: string, updates: Partial<Omit<OpeningStockEntry, 'id'>>): Promise<void> {
-  await updateDoc(doc(db, OPENING_STOCK_COL, id), updates);
+  const oldDocSnap = await getDoc(doc(db, OPENING_STOCK_COL, id));
+  if (!oldDocSnap.exists()) return;
+  const oldEntry = oldDocSnap.data() as OpeningStockEntry;
+
+  const batch = writeBatch(db);
+  batch.update(doc(db, OPENING_STOCK_COL, id), updates);
+
+  if (updates.items) {
+    const oldItemsMap = new Map<string, OpeningStockItem>();
+    oldEntry.items.forEach(i => oldItemsMap.set(i.item_id, i));
+
+    for (const newItem of updates.items) {
+      const oldItem = oldItemsMap.get(newItem.item_id);
+      const oldQty = oldItem ? oldItem.qty : 0;
+      const qtyDiff = newItem.qty - oldQty;
+
+      if (qtyDiff !== 0) {
+        const itemSnap = await getDoc(doc(db, ITEMS_COL, newItem.item_id));
+        if (itemSnap.exists()) {
+          const itemData = itemSnap.data() as InventoryItem;
+          const current_stock = (itemData.current_stock || 0) + qtyDiff;
+          
+          batch.update(doc(db, ITEMS_COL, newItem.item_id), {
+            current_stock,
+            opening_stock: newItem.qty
+          });
+          
+          const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+          batch.set(doc(db, TXNS_COL, txnId), {
+            id: txnId,
+            item_id: newItem.item_id,
+            transaction_type: 'Adjustment',
+            quantity: qtyDiff,
+            amount: qtyDiff * newItem.unit_cost,
+            date: new Date().toISOString()
+          });
+        }
+      }
+    }
+  }
+
+  await batch.commit();
 }
 
 export async function deleteOpeningStock(id: string): Promise<void> {
