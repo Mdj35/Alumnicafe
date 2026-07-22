@@ -194,6 +194,37 @@ export async function addInventoryItem(item: Omit<InventoryItem, 'id' | 'created
 }
 
 export async function updateInventoryItem(id: string, item: Partial<InventoryItem>): Promise<InventoryItem[]> {
+  const docSnap = await getDoc(doc(db, ITEMS_COL, id));
+  if (docSnap.exists()) {
+    const existing = docSnap.data() as InventoryItem;
+    const oldOpening = existing.opening_stock || 0;
+    const newOpening = item.opening_stock !== undefined ? item.opening_stock : oldOpening;
+    const qtyDiff = newOpening - oldOpening;
+
+    let newCurrentStock = existing.current_stock || 0;
+    
+    if (item.current_stock !== undefined) {
+      newCurrentStock = item.current_stock;
+    } else if (qtyDiff !== 0) {
+      newCurrentStock += qtyDiff;
+      item.current_stock = newCurrentStock;
+    }
+
+    const currentStockDiff = newCurrentStock - (existing.current_stock || 0);
+
+    if (currentStockDiff !== 0) {
+      const txnId = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+      await setDoc(doc(db, TXNS_COL, txnId), {
+        id: txnId,
+        item_id: id,
+        transaction_type: 'Adjustment',
+        quantity: currentStockDiff,
+        amount: currentStockDiff * (existing.unit_cost || 0),
+        date: new Date().toISOString()
+      });
+    }
+  }
+
   await updateDoc(doc(db, ITEMS_COL, id), item);
   return await getInventoryItems();
 }

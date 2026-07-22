@@ -23,7 +23,7 @@ export default function InventoryItems() {
   const [form, setForm] = useState({
     item_code: '', item_name: '', category_id: '', sub_category: '', unit: 'pcs', purchase_unit: '', usage_unit: '', description: '', supplier: '',
     purchase_price: 0, package_quantity: 1, selling_price: 0, 
-    opening_stock: 0, minimum_stock: 0
+    opening_stock: 0, current_stock: 0, minimum_stock: 0
   });
 
   useEffect(() => {
@@ -85,7 +85,8 @@ export default function InventoryItems() {
         ...form,
         unit_cost,
         cost_price: unit_cost,
-        opening_stock: form.opening_stock
+        opening_stock: form.opening_stock,
+        current_stock: form.current_stock
       });
       setItems(updated);
     } else {
@@ -118,6 +119,7 @@ export default function InventoryItems() {
       package_quantity: item.package_quantity || 1,
       selling_price: item.selling_price || 0,
       opening_stock: item.opening_stock || 0,
+      current_stock: item.current_stock || 0,
       minimum_stock: item.minimum_stock || 0
     });
     setShowModal(true);
@@ -133,7 +135,7 @@ export default function InventoryItems() {
       item_code: newCode,
       item_name: '', category_id: categories[0] || '', sub_category: '', unit: 'pcs', purchase_unit: '', usage_unit: 'pcs', description: '', supplier: '',
       purchase_price: 0, package_quantity: 1, selling_price: 0, 
-      opening_stock: 0, minimum_stock: 0
+      opening_stock: 0, current_stock: 0, minimum_stock: 0
     });
     setShowModal(true);
   };
@@ -316,8 +318,12 @@ export default function InventoryItems() {
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase">Opening Stock Qty (in {form.unit})</label>
                   <input required type="number" step="0.01" min="0" value={form.opening_stock} onChange={e => setForm({...form, opening_stock: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase">Current Stock Qty (in {form.unit})</label>
+                  <input required type="number" step="0.01" value={form.current_stock} onChange={e => setForm({...form, current_stock: parseFloat(e.target.value) || 0})} className="w-full mt-1 px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-blue focus:ring-1 focus:ring-hcdc-blue outline-none" />
                   {editingItem && (
-                    <p className="text-[10px] text-amber-600 mt-1 font-medium">⚠ Editing this updates the recorded opening balance only. It does not change the current stock level.</p>
+                    <p className="text-[10px] text-hcdc-blue mt-1 font-medium">Any changes here will log an adjustment transaction.</p>
                   )}
                 </div>
                 <div>
