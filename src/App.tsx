@@ -46,6 +46,7 @@ interface Product {
   icon: string;
   image?: string;
   ingredients?: { inventoryId: string; quantity: number }[];
+  cashier_stock_threshold?: number;
 }
 
 interface CartItem extends Product {
@@ -684,11 +685,15 @@ export default function App() {
                         ) : (
                           <span className="text-4xl">{product.icon}</span>
                         )}
-                        {hasInventoryTracking && (
-                          <div className={`absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 ${isOut ? 'bg-red-500 text-white' : 'bg-hcdc-blue/90 text-white backdrop-blur-sm'}`}>
-                            {isOut ? 'No Stock' : isFinite(minServings) ? `${minServings} left` : ''}
-                          </div>
-                        )}
+                        {hasInventoryTracking && (() => {
+                          const threshold = product.cashier_stock_threshold ?? 20;
+                          const displayCount = Math.min(minServings, threshold);
+                          return (
+                            <div className={`absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 ${isOut ? 'bg-red-500 text-white' : 'bg-hcdc-blue/90 text-white backdrop-blur-sm'}`}>
+                              {isOut ? 'Sold Out' : `${displayCount} Available`}
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div>
                         <h3 className="font-bold text-gray-800 text-xs leading-snug h-10 flex items-center justify-center px-1">{product.name}</h3>

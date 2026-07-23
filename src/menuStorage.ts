@@ -16,6 +16,7 @@ export interface MenuItem {
   coffeeGrams?: number; 
   milkAmount?: number; 
   ingredients?: MenuItemIngredient[];
+  cashier_stock_threshold?: number;
 }
 
 const MENU_COLLECTION = 'menu';

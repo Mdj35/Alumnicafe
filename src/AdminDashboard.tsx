@@ -79,7 +79,7 @@ export default function AdminDashboard() {
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [menuSearch, setMenuSearch] = useState('');
   const [menuCategoryFilter, setMenuCategoryFilter] = useState('All');
-  const [formData, setFormData] = useState({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [] as { inventoryId: string, quantity: number }[] });
+  const [formData, setFormData] = useState({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [] as { inventoryId: string, quantity: number }[], cashierStockThreshold: '20' });
   const [newCategoryName, setNewCategoryName] = useState('');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
 
@@ -145,6 +145,18 @@ export default function AdminDashboard() {
   const handleStockBaseChange = (base: 'opening' | 'current') => {
     setPosStockBase(base);
     localStorage.setItem('pos_stock_base', base);
+  };
+
+  const [posStockDisplayThreshold, setPosStockDisplayThreshold] = useState<number>(
+    parseInt(localStorage.getItem('pos_stock_display_threshold') || '9999', 10)
+  );
+
+  const handleStockDisplayThresholdChange = (value: string) => {
+    const num = parseInt(value, 10);
+    if (!isNaN(num) && num >= 0) {
+      setPosStockDisplayThreshold(num);
+      localStorage.setItem('pos_stock_display_threshold', String(num));
+    }
   };
 
   useEffect(() => {
@@ -374,7 +386,8 @@ export default function AdminDashboard() {
       category: formData.category,
       icon: formData.icon,
       image: formData.image,
-      ingredients: formData.ingredients
+      ingredients: formData.ingredients,
+      cashier_stock_threshold: parseInt(formData.cashierStockThreshold, 10) || 20
     });
     setMenuItems(updated);
     
@@ -383,7 +396,7 @@ export default function AdminDashboard() {
       await syncRecipeForMenuItem(newItem, inventory);
     }
 
-    setFormData({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [] });
+    setFormData({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [], cashierStockThreshold: '20' });
     setShowAddModal(false);
   };
 
@@ -395,7 +408,8 @@ export default function AdminDashboard() {
       category: formData.category,
       icon: formData.icon,
       image: formData.image,
-      ingredients: formData.ingredients
+      ingredients: formData.ingredients,
+      cashier_stock_threshold: parseInt(formData.cashierStockThreshold, 10) || 20
     });
     setMenuItems(updated);
     
@@ -405,7 +419,7 @@ export default function AdminDashboard() {
     }
 
     setEditingItem(null);
-    setFormData({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [] });
+    setFormData({ name: '', price: '', category: 'Coffee', icon: '☕', image: '', ingredients: [], cashierStockThreshold: '20' });
   };
 
   const handleDeleteItem = (id: number, name: string) => {
@@ -437,7 +451,8 @@ export default function AdminDashboard() {
       category: item.category,
       icon: item.icon,
       image: item.image || '',
-      ingredients: item.ingredients ? item.ingredients.map(ing => ({ ...ing })) : []
+      ingredients: item.ingredients ? item.ingredients.map(ing => ({ ...ing })) : [],
+      cashierStockThreshold: item.cashier_stock_threshold?.toString() || '20'
     });
   };
 
@@ -1771,7 +1786,41 @@ export default function AdminDashboard() {
                       </button>
                     </div>
                   </div>
+
+                  {/* Stock Display Threshold Setting */}
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center p-5 bg-gray-50/50 rounded-2xl border border-gray-100 gap-4">
+                    <div>
+                      <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                        <Package className="w-4 h-4 text-hcdc-blue" />
+                        Stock Count Display Threshold
+                      </h4>
+                      <p className="text-xs text-gray-500 font-medium mt-1 max-w-md">
+                        The POS terminal will only show the remaining stock badge on an item when servings are at or below this number. Set a high number (e.g. 9999) to always show it.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center bg-white border-2 border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                        <button
+                          onClick={() => handleStockDisplayThresholdChange(String(Math.max(0, posStockDisplayThreshold - 1)))}
+                          className="px-3 py-2 text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue transition-colors font-bold text-lg"
+                        >−</button>
+                        <input
+                          type="number"
+                          min={0}
+                          value={posStockDisplayThreshold}
+                          onChange={(e) => handleStockDisplayThresholdChange(e.target.value)}
+                          className="w-20 text-center font-black text-gray-800 text-sm border-none focus:ring-0 bg-transparent py-2"
+                        />
+                        <button
+                          onClick={() => handleStockDisplayThresholdChange(String(posStockDisplayThreshold + 1))}
+                          className="px-3 py-2 text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue transition-colors font-bold text-lg"
+                        >+</button>
+                      </div>
+                      <span className="text-xs font-bold text-gray-400">servings</span>
+                    </div>
+                  </div>
                 </div>
+
               </div>
             </div>
           )}
@@ -2074,6 +2123,16 @@ export default function AdminDashboard() {
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                     placeholder="0.00"
+                    className="w-full h-14 px-6 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue focus:bg-white rounded-2xl font-bold text-lg transition-all focus:ring-0"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Cashier Stock Threshold</label>
+                  <input
+                    type="number"
+                    value={formData.cashierStockThreshold}
+                    onChange={(e) => setFormData({ ...formData, cashierStockThreshold: e.target.value })}
+                    placeholder="20"
                     className="w-full h-14 px-6 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue focus:bg-white rounded-2xl font-bold text-lg transition-all focus:ring-0"
                   />
                 </div>
