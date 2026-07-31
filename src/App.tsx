@@ -500,7 +500,7 @@ export default function App() {
 
   // --- UI Components ---
   return (
-    <div className="flex flex-col h-screen select-none print:block print:h-auto print:bg-white">
+    <div className="flex flex-col h-[100dvh] select-none print:block print:h-auto print:bg-white">
       {/* Header Bar */}
       <header className="no-print h-16 md:h-20 bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark flex items-center justify-between px-4 md:px-10 text-white shadow-xl shrink-0 z-40 relative">
         <div className="flex items-center gap-3 md:gap-5">
@@ -840,7 +840,7 @@ export default function App() {
           </div>
 
           {/* Checkout Area */}
-          <div className="bg-white border-t border-gray-100 p-4 md:p-8 shrink-0 pb-safe">
+          <div className="bg-white border-t border-gray-100 p-4 md:p-6 shrink overflow-y-auto pb-safe">
             {/* Discounts */}
             <div className="mb-4 md:mb-6">
               <label className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2 md:mb-3">
