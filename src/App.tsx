@@ -98,7 +98,7 @@ const calculateRecipeServings = (
     let stockQty = 0;
     if (stockItem) {
       if (stockBase === 'opening') {
-        stockQty = hasOpeningStockToday ? Number(stockItem.opening_stock ?? 0) : 0;
+        stockQty = Number(stockItem.opening_stock ?? 0);
       } else {
         stockQty = Number(stockItem.current_stock ?? 0);
       }
