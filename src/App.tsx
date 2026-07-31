@@ -225,6 +225,16 @@ export default function App() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [hasOpeningStockToday, setHasOpeningStockToday] = useState(true);
+  // Tracks how many of each product (by id) have been sold today — persisted in localStorage by date
+  const getTodayKey = () => `sold_today_${new Date().toISOString().slice(0, 10)}`;
+  const [soldToday, setSoldToday] = useState<Record<number, number>>(() => {
+    try {
+      const raw = localStorage.getItem(getTodayKey());
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const [newProduct, setNewProduct] = useState({ name: '', price: 0, category: 'Coffee', icon: '☕' });
 
@@ -369,6 +379,18 @@ export default function App() {
   }, [cart, recipes]);
 
   const canAddProduct = (product: Product, deltaQty: number) => {
+    const isThresholdEnabled = localStorage.getItem('pos_stock_threshold_enabled') === 'true';
+    const itemThreshold = (product as MenuItem).cashier_stock_threshold;
+
+    // Threshold check: limit total sold (cart + already sold this session) to the threshold
+    if (isThresholdEnabled && itemThreshold !== undefined && itemThreshold > 0) {
+      const alreadySold = soldToday[product.id] || 0;
+      const inCart = cart.find(c => c.id === product.id)?.quantity || 0;
+      if (alreadySold + inCart + deltaQty > itemThreshold) {
+        return false;
+      }
+    }
+
     const ingredients = getProductIngredients(product, recipes);
     if (!ingredients.length) return true;
 
@@ -378,7 +400,15 @@ export default function App() {
 
   const addToCart = (product: Product) => {
     if (!canAddProduct(product, 1)) {
-      alert(`Cannot add ${product.name}, insufficient inventory!`);
+      const isThresholdEnabled = localStorage.getItem('pos_stock_threshold_enabled') === 'true';
+      const itemThreshold = (product as MenuItem).cashier_stock_threshold;
+      if (isThresholdEnabled && itemThreshold !== undefined && itemThreshold > 0) {
+        const alreadySold = soldToday[product.id] || 0;
+        const remaining = Math.max(0, itemThreshold - alreadySold);
+        alert(`Cannot add more ${product.name}. Daily limit reached (${itemThreshold} max, ${remaining} remaining).`);
+      } else {
+        alert(`Cannot add ${product.name}, insufficient inventory!`);
+      }
       return;
     }
     setCart(prev => {
@@ -400,7 +430,15 @@ export default function App() {
     if (delta > 0) {
       const product = products.find(p => p.id === id) || cart.find(p => p.id === id);
       if (product && !canAddProduct(product, delta)) {
-        alert(`Cannot add more, insufficient inventory!`);
+        const isThresholdEnabled = localStorage.getItem('pos_stock_threshold_enabled') === 'true';
+        const itemThreshold = (product as MenuItem).cashier_stock_threshold;
+        if (isThresholdEnabled && itemThreshold !== undefined && itemThreshold > 0) {
+          const alreadySold = soldToday[id] || 0;
+          const remaining = Math.max(0, itemThreshold - alreadySold);
+          alert(`Cannot add more ${product.name}. Daily limit reached (${itemThreshold} max, ${remaining} remaining).`);
+        } else {
+          alert(`Cannot add more, insufficient inventory!`);
+        }
         return;
       }
     }
@@ -469,11 +507,23 @@ export default function App() {
         orNumber: receiptOption === 'With OR' ? orNumber.trim() : undefined,
       });
 
-      // Deduct inventory
+      // Deduct inventory and update sold-today counter
       if (cart.length > 0) {
         await deductIngredientsByRecipe(cart.map(c => ({ id: c.id, quantity: c.quantity })), txnNumber);
         const updatedInv = await getInventoryItems();
         setInventory(updatedInv);
+        // Update the per-product sold count for threshold display and persist to localStorage
+        setSoldToday(prev => {
+          const next = { ...prev };
+          cart.forEach(item => {
+            next[item.id] = (next[item.id] || 0) + item.quantity;
+          });
+          try {
+            const key = `sold_today_${new Date().toISOString().slice(0, 10)}`;
+            localStorage.setItem(key, JSON.stringify(next));
+          } catch { /* ignore storage errors */ }
+          return next;
+        });
       }
 
       setShowReceipt(true);
@@ -750,32 +800,27 @@ export default function App() {
 
                           if (isOut) {
                             return (
-                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 bg-red-500 text-white">
+                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase py-0.5 z-10 bg-red-500 text-white">
                                 Sold Out
                               </div>
                             );
                           }
 
                           if (hasInventoryTracking) {
-                            let displayCount = minServings;
-                            
-                            // If threshold is enabled, cap the displayed count at the threshold
-                            if (isThresholdEnabled && itemThreshold !== undefined && itemThreshold > 0) {
-                              displayCount = Math.min(minServings, itemThreshold);
-                            }
-                            
-                            return (
-                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 bg-hcdc-blue/90 text-white backdrop-blur-sm">
-                                {displayCount} Available
-                              </div>
-                            );
-                          }
+                            let displayCount: number;
 
-                          // No inventory tracking but has a threshold set — show threshold as count
-                          if (isThresholdEnabled && itemThreshold !== undefined) {
+                            if (isThresholdEnabled && itemThreshold !== undefined && itemThreshold > 0) {
+                              // Threshold mode: count down from threshold based on how many sold this session
+                              const soldCount = soldToday[product.id] || 0;
+                              displayCount = Math.max(0, itemThreshold - soldCount);
+                            } else {
+                              // No threshold: show real remaining servings from inventory
+                              displayCount = minServings;
+                            }
+
                             return (
-                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 bg-hcdc-blue/90 text-white backdrop-blur-sm">
-                                {itemThreshold} Available
+                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase py-0.5 z-10 bg-hcdc-blue/90 text-white backdrop-blur-sm">
+                                {displayCount} Available
                               </div>
                             );
                           }
