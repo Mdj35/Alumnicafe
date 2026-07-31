@@ -150,6 +150,10 @@ export default function AdminDashboard() {
   const [posStockDisplayThreshold, setPosStockDisplayThreshold] = useState<number>(
     parseInt(localStorage.getItem('pos_stock_display_threshold') || '9999', 10)
   );
+  
+  const [isPosStockThresholdEnabled, setIsPosStockThresholdEnabled] = useState<boolean>(
+    localStorage.getItem('pos_stock_threshold_enabled') === 'true'
+  );
 
   const handleStockDisplayThresholdChange = (value: string) => {
     const num = parseInt(value, 10);
@@ -157,6 +161,12 @@ export default function AdminDashboard() {
       setPosStockDisplayThreshold(num);
       localStorage.setItem('pos_stock_display_threshold', String(num));
     }
+  };
+
+  const handleToggleThreshold = () => {
+    const newVal = !isPosStockThresholdEnabled;
+    setIsPosStockThresholdEnabled(newVal);
+    localStorage.setItem('pos_stock_threshold_enabled', String(newVal));
   };
 
   useEffect(() => {
@@ -1790,33 +1800,29 @@ export default function AdminDashboard() {
                   {/* Stock Display Threshold Setting */}
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center p-5 bg-gray-50/50 rounded-2xl border border-gray-100 gap-4">
                     <div>
-                      <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-hcdc-blue" />
-                        Stock Count Display Threshold
-                      </h4>
-                      <p className="text-xs text-gray-500 font-medium mt-1 max-w-md">
-                        The POS terminal will only show the remaining stock badge on an item when servings are at or below this number. Set a high number (e.g. 9999) to always show it.
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <div className="flex items-center bg-white border-2 border-gray-100 rounded-xl shadow-sm overflow-hidden">
+                      <div className="flex items-center gap-3">
+                        <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                          <Package className="w-4 h-4 text-hcdc-blue" />
+                          Stock Count Display Threshold
+                        </h4>
                         <button
-                          onClick={() => handleStockDisplayThresholdChange(String(Math.max(0, posStockDisplayThreshold - 1)))}
-                          className="px-3 py-2 text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue transition-colors font-bold text-lg"
-                        >−</button>
-                        <input
-                          type="number"
-                          min={0}
-                          value={posStockDisplayThreshold}
-                          onChange={(e) => handleStockDisplayThresholdChange(e.target.value)}
-                          className="w-20 text-center font-black text-gray-800 text-sm border-none focus:ring-0 bg-transparent py-2"
-                        />
-                        <button
-                          onClick={() => handleStockDisplayThresholdChange(String(posStockDisplayThreshold + 1))}
-                          className="px-3 py-2 text-gray-400 hover:text-hcdc-blue hover:bg-hcdc-light-blue transition-colors font-bold text-lg"
-                        >+</button>
+                          onClick={handleToggleThreshold}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                            isPosStockThresholdEnabled ? 'bg-hcdc-blue' : 'bg-gray-300'
+                          }`}
+                        >
+                          <span
+                            className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
+                              isPosStockThresholdEnabled ? 'translate-x-5' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
                       </div>
-                      <span className="text-xs font-bold text-gray-400">servings</span>
+                      <p className="text-xs text-gray-500 font-medium mt-1 max-w-md">
+                        {isPosStockThresholdEnabled 
+                          ? "The POS terminal will only show the remaining stock badge on an item when servings are at or below the item's Cashier Stock Threshold."
+                          : "Threshold is disabled. The POS terminal will always display the exact current stock for tracked items."}
+                      </p>
                     </div>
                   </div>
                 </div>

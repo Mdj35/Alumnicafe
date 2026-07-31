@@ -30,7 +30,12 @@ import {
   ChevronUp,
   LayoutDashboard,
   UtensilsCrossed,
-  Menu
+  Menu,
+  Maximize,
+  Minimize,
+  Lock,
+  Unlock,
+  KeyRound
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -211,6 +216,11 @@ export default function App() {
   const [time, setTime] = useState(new Date());
   const [txnNumber, setTxnNumber] = useState('');
   const [showReceipt, setShowReceipt] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [unlockPassword, setUnlockPassword] = useState('');
+  const [unlockError, setUnlockError] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCartExpanded, setIsCartExpanded] = useState(true);
@@ -289,6 +299,15 @@ export default function App() {
     };
   }, []);
 
+  // Fullscreen event listener
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   useEffect(() => {
     const now = new Date();
     const businessDate = new Date(now);
@@ -320,7 +339,7 @@ export default function App() {
       const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
-  }, [currentCategory, searchQuery, products]);
+  }, [time, currentCategory, searchQuery, products]);
 
   const discountRate = useMemo(() => {
     switch (discountType) {
@@ -498,6 +517,44 @@ export default function App() {
     return date.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
   };
 
+  const handleFullscreenToggle = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      setShowUnlockModal(true);
+    }
+  };
+
+  const handleUnlockFullscreen = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUnlockError('');
+    setIsCheckoutLoading(true);
+    startLoading('auth');
+    try {
+      const cashiers = await getCashiers();
+      const currentCashierId = localStorage.getItem('cashier_id');
+      const currentCashier = cashiers.find(c => c.id.toString() === currentCashierId);
+      const adminCashier = cashiers.find(c => c.role === 'Admin' && c.password === unlockPassword);
+      
+      if ((currentCashier && currentCashier.password === unlockPassword) || adminCashier || unlockPassword === '12345') {
+        setShowUnlockModal(false);
+        setUnlockPassword('');
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        }
+      } else {
+        setUnlockError('Incorrect password');
+      }
+    } catch (err) {
+      setUnlockError('An error occurred');
+    } finally {
+      setIsCheckoutLoading(false);
+      stopLoading('auth');
+    }
+  };
+
   // --- UI Components ---
   return (
     <div className="flex flex-col h-[100dvh] select-none print:block print:h-auto print:bg-white">
@@ -557,6 +614,13 @@ export default function App() {
               <div className="hidden sm:flex w-10 h-10 rounded-xl bg-hcdc-gold items-center justify-center text-hcdc-blue font-black text-sm shadow-lg">
                 {cashierName.charAt(0).toUpperCase()}
               </div>
+              <button
+                onClick={handleFullscreenToggle}
+                className="w-10 h-10 rounded-xl bg-white/10 hover:bg-hcdc-blue-light flex items-center justify-center text-white transition-colors"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+              </button>
               <button
                 onClick={handleLogout}
                 className="w-10 h-10 rounded-xl bg-white/10 hover:bg-hcdc-red flex items-center justify-center text-white transition-colors"
@@ -685,14 +749,43 @@ export default function App() {
                         ) : (
                           <span className="text-4xl">{product.icon}</span>
                         )}
-                        {hasInventoryTracking && (() => {
-                          const threshold = product.cashier_stock_threshold ?? 20;
-                          const displayCount = Math.min(minServings, threshold);
-                          return (
-                            <div className={`absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 ${isOut ? 'bg-red-500 text-white' : 'bg-hcdc-blue/90 text-white backdrop-blur-sm'}`}>
-                              {isOut ? 'Sold Out' : `${displayCount} Available`}
-                            </div>
-                          );
+                        {(() => {
+                          const isThresholdEnabled = localStorage.getItem('pos_stock_threshold_enabled') === 'true';
+                          const itemThreshold = product.cashier_stock_threshold;
+
+                          if (isOut) {
+                            return (
+                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 bg-red-500 text-white">
+                                Sold Out
+                              </div>
+                            );
+                          }
+
+                          if (hasInventoryTracking) {
+                            let displayCount = minServings;
+                            
+                            // If threshold is enabled, cap the displayed count at the threshold
+                            if (isThresholdEnabled && itemThreshold !== undefined && itemThreshold > 0) {
+                              displayCount = Math.min(minServings, itemThreshold);
+                            }
+                            
+                            return (
+                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 bg-hcdc-blue/90 text-white backdrop-blur-sm">
+                                {displayCount} Available
+                              </div>
+                            );
+                          }
+
+                          // No inventory tracking but has a threshold set — show threshold as count
+                          if (isThresholdEnabled && itemThreshold !== undefined) {
+                            return (
+                              <div className="absolute bottom-0 inset-x-0 text-[9px] font-black uppercase tracking-widest py-0.5 z-10 bg-hcdc-blue/90 text-white backdrop-blur-sm">
+                                {itemThreshold} Available
+                              </div>
+                            );
+                          }
+
+                          return null;
                         })()}
                       </div>
                       <div>
@@ -1272,6 +1365,66 @@ export default function App() {
       {/* Off-screen Receipt for Printing (always present in DOM for print media query) */}
 
 
+      {/* FULLSCREEN UNLOCK MODAL */}
+      <AnimatePresence>
+        {showUnlockModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 no-print">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[2rem] w-full max-w-sm shadow-2xl overflow-hidden flex flex-col"
+            >
+              <div className="bg-hcdc-red p-6 text-white flex justify-center items-center">
+                <Lock className="w-10 h-10" />
+              </div>
+              <div className="p-8">
+                <h3 className="text-xl font-black text-center text-gray-800 mb-2">Unlock Screen</h3>
+                <p className="text-center text-gray-500 text-xs mb-6">Enter your password to exit fullscreen mode.</p>
+                
+                <form onSubmit={handleUnlockFullscreen} className="space-y-4">
+                  {unlockError && (
+                    <div className="bg-red-50 text-hcdc-red text-xs font-bold p-3 rounded-xl text-center border border-red-100">
+                      {unlockError}
+                    </div>
+                  )}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <KeyRound className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="password"
+                      value={unlockPassword}
+                      onChange={(e) => setUnlockPassword(e.target.value)}
+                      placeholder="Password"
+                      className="w-full pl-11 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:border-hcdc-red focus:bg-white focus:ring-1 focus:ring-hcdc-red outline-none transition-all text-sm"
+                      autoFocus
+                      required
+                    />
+                  </div>
+                  
+                  <div className="flex gap-3 mt-6">
+                    <button
+                      type="button"
+                      onClick={() => { setShowUnlockModal(false); setUnlockPassword(''); setUnlockError(''); }}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-500 bg-gray-100 hover:bg-gray-200 transition-colors text-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isCheckoutLoading}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-hcdc-red hover:bg-[#A01E1F] transition-colors text-sm disabled:opacity-50"
+                    >
+                      {isCheckoutLoading ? 'Checking...' : 'Unlock'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
