@@ -22,12 +22,11 @@
 
 @media print {
   @page {
-    size: 72mm auto; /* 72mm width, auto length for continuous roll */
     margin: 0;
   }
   
   html, body {
-    width: 72mm;
+    width: 100%;
     margin: 0 !important;
     padding: 0 !important;
     background: white !important;
@@ -44,14 +43,13 @@
   }
   
   #receipt-content {
-    width: 72mm !important;
-    max-width: 72mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 5mm 5mm 15mm 5mm !important;
+    padding: 0 !important;
     background: white !important;
     border: none !important;
     box-shadow: none !important;
-    font-size: 10px !important;
     line-height: 1.2 !important;
     page-break-after: always !important;
     break-after: always !important;

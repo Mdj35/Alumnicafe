@@ -98,15 +98,10 @@ const calculateRecipeServings = (
       return;
     }
 
-    const stockBase = localStorage.getItem('pos_stock_base') || 'opening';
     const stockItem = inventory.find((item) => item.id === ing.item_id);
     let stockQty = 0;
     if (stockItem) {
-      if (stockBase === 'opening') {
-        stockQty = Number(stockItem.opening_stock ?? 0);
-      } else {
-        stockQty = Number(stockItem.current_stock ?? 0);
-      }
+      stockQty = Number(stockItem.current_stock ?? 0);
     }
     const available = Math.max(0, stockQty - (usedInventory[ing.item_id] || 0));
     const servings = Math.floor(available / requiredQty);
@@ -1152,65 +1147,63 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth print:overflow-visible print:p-0 print:bg-white print:block">
                 {/* Simulated Thermal Receipt */}
-                <div id="receipt-content" className="bg-white p-5 shadow-md mx-auto w-[72mm] max-w-full font-mono text-[10px] text-gray-800 relative">
+                <div id="receipt-content" className="bg-white p-4 shadow-md mx-auto w-full max-w-[300px] text-[12px] text-black relative print:w-full print:max-w-full print:shadow-none print:p-2">
                   {/* Background watermark */}
                   <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none">
                     <UtensilsCrossed className="w-48 h-48" />
                   </div>
 
-                  <div className="text-center space-y-1 mb-6 relative">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
-                    <p className="text-4xl font-black text-hcdc-blue tracking-tight">{txnNumber.split('-').pop()}</p>
-                    <div className="h-2"></div>
-                    <p className="text-base font-black uppercase tracking-tight text-gray-900">HCDC Alumni Cafe</p>
+                  <div className="text-center space-y-1 mb-5 relative">
+                    <p className="text-xs font-bold text-gray-600 uppercase">Order Number</p>
+                    <p className="text-4xl font-black text-black">{txnNumber.split('-').pop()}</p>
+                    <div className="h-1"></div>
+                    <p className="text-base font-black uppercase text-black">HCDC Alumni Cafe</p>
                   </div>
 
                   <div className="border-t border-dashed border-gray-400 py-3 space-y-1.5 text-xs relative">
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Cashier:</span>
-                      <span className="font-bold">{cashierName}</span>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-gray-600">Cashier:</span>
+                      <span className="font-bold text-right">{cashierName}</span>
                     </div>
                     <div className="flex justify-between gap-2">
-                      <span className="text-gray-500 shrink-0">Date & Time:</span>
+                      <span className="text-gray-600 shrink-0">Date & Time:</span>
                       <span className="font-bold text-right">{formatDate(time)} {formatTime(time)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-500">Transaction Number:</span>
-                      <span className="font-bold">{txnNumber}</span>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-gray-600">Transaction:</span>
+                      <span className="font-bold text-right">{txnNumber}</span>
                     </div>
                     {discountType !== 'REGULAR' && (
                       <>
-                        <div className="flex justify-between mt-2 pt-2 border-t border-dashed border-gray-400">
-                          <span className="text-gray-500">Customer Name:</span>
-                          <span className="font-bold">{customerName}</span>
+                        <div className="flex justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-400">
+                          <span className="text-gray-600">Customer:</span>
+                          <span className="font-bold text-right">{customerName}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">{discountType} ID:</span>
-                          <span className="font-bold">{customerIdNumber}</span>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-600">{discountType} ID:</span>
+                          <span className="font-bold text-right">{customerIdNumber}</span>
                         </div>
                       </>
                     )}
                   </div>
 
-                  <div className="border-t border-gray-400 pt-3 mb-1 font-bold text-[10px] relative">
-                    <div className="flex justify-between gap-4 text-gray-500">
-                      <span className="w-10">QTY</span>
-                      <span className="w-20">CATEGORY</span>
-                      <span className="flex-1 text-right">ITEM</span>
+                  <div className="border-t border-gray-400 pt-2 mb-1 font-bold text-[11px] relative">
+                    <div className="flex justify-between gap-2 text-gray-600">
+                      <span className="w-8">QTY</span>
+                      <span className="flex-1">ITEM</span>
                     </div>
                   </div>
                   <div className="border-b border-gray-400 pb-2 mb-4 relative">
                     {cart.map(item => (
-                      <div key={item.id} className="flex justify-between gap-4 py-1.5 leading-tight text-[11px]">
-                        <span className="w-10 font-bold">{item.quantity}</span>
-                        <span className="w-20 truncate text-gray-600">{item.category}</span>
-                        <span className="flex-1 text-right font-bold truncate text-gray-900">{item.name}</span>
+                      <div key={item.id} className="flex justify-between gap-2 py-1 leading-tight text-[12px]">
+                        <span className="w-8 font-bold">{item.quantity}</span>
+                        <span className="flex-1 font-bold text-black">{item.name} <span className="text-[10px] text-gray-500 font-normal block">{item.category}</span></span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="border-t border-dashed border-gray-400 pt-4 text-center relative">
-                    <p className="font-bold text-[10px] text-gray-500 tracking-wider">
+                  <div className="border-t border-dashed border-gray-400 pt-3 text-center relative">
+                    <p className="font-bold text-[10px] text-gray-500">
                       THIS IS NOT AN OFFICIAL RECEIPT
                     </p>
                   </div>

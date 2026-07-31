@@ -1762,40 +1762,6 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="space-y-6">
-                  {/* Stock Base Setting */}
-                  <div className="flex flex-col sm:flex-row justify-between sm:items-center p-5 bg-gray-50/50 rounded-2xl border border-gray-100 gap-4">
-                    <div>
-                      <h4 className="font-bold text-gray-800 flex items-center gap-2">
-                        <Package className="w-4 h-4 text-hcdc-blue" />
-                        Available Stock Calculation Base
-                      </h4>
-                      <p className="text-xs text-gray-500 font-medium mt-1 max-w-md">
-                        Choose whether the POS terminal calculates remaining servings based on the opening stock of the day or the live current stock.
-                      </p>
-                    </div>
-                    <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-100 shrink-0">
-                      <button
-                        onClick={() => handleStockBaseChange('opening')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                          posStockBase === 'opening' 
-                            ? 'bg-hcdc-blue text-white shadow-md' 
-                            : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        Opening Stock
-                      </button>
-                      <button
-                        onClick={() => handleStockBaseChange('current')}
-                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${
-                          posStockBase === 'current' 
-                            ? 'bg-hcdc-blue text-white shadow-md' 
-                            : 'text-gray-500 hover:bg-gray-50'
-                        }`}
-                      >
-                        Current Stock
-                      </button>
-                    </div>
-                  </div>
 
                   {/* Stock Display Threshold Setting */}
                   <div className="flex flex-col sm:flex-row justify-between sm:items-center p-5 bg-gray-50/50 rounded-2xl border border-gray-100 gap-4">
