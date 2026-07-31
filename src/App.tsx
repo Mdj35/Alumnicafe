@@ -1152,14 +1152,13 @@ export default function App() {
 
               <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth print:overflow-visible print:p-0 print:bg-white print:block">
                 {/* Simulated Thermal Receipt */}
-                <div id="receipt-content" className="bg-white p-6 shadow-md mx-auto max-w-[320px] font-mono text-[11px] text-gray-800 border-t-8 border-hcdc-blue relative">
+                <div id="receipt-content" className="bg-white p-5 shadow-md mx-auto w-[72mm] max-w-full font-mono text-[10px] text-gray-800 relative">
                   {/* Background watermark */}
                   <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none">
                     <UtensilsCrossed className="w-48 h-48" />
                   </div>
 
                   <div className="text-center space-y-1 mb-6 relative">
-                    <img src={cafeLogo} alt="HCDC Logo" className="w-16 h-16 mx-auto mb-2" />
                     <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Order Number</p>
                     <p className="text-4xl font-black text-hcdc-blue tracking-tight">{txnNumber.split('-').pop()}</p>
                     <div className="h-2"></div>
