@@ -25,7 +25,7 @@ export default function InventoryDashboard() {
 
   return (
     <div className="flex flex-col h-full bg-[#F9FAFB]">
-      <div className="mb-6 flex space-x-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 w-fit overflow-x-auto custom-scrollbar">
+      <div className="mb-6 flex space-x-2 bg-white p-1.5 rounded-2xl shadow-sm border border-gray-100 w-full overflow-x-auto custom-scrollbar">
         {navItems.map(item => (
           <button
             key={item.id}

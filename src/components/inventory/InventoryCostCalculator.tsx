@@ -91,7 +91,7 @@ export default function InventoryCostCalculator() {
   return (
     <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[700px]">
       
-      <div className="p-8 border-b border-gray-50 flex justify-between items-start bg-gray-50/50">
+      <div className="p-6 md:p-8 border-b border-gray-50 flex flex-col md:flex-row md:justify-between md:items-start gap-4 bg-gray-50/50">
         <div>
           <h3 className="text-xl font-black text-gray-800 flex items-center gap-2">
             <Calculator className="w-5 h-5 text-hcdc-blue" />
@@ -99,11 +99,11 @@ export default function InventoryCostCalculator() {
           </h3>
           <p className="text-xs text-gray-500 font-medium mt-1">Calculate Cost of Goods Sold (COGS) and current inventory value.</p>
         </div>
-        <div className="flex items-center gap-4 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-          <Calendar className="w-4 h-4 text-gray-400 ml-2" />
-          <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm self-start">
+          <Calendar className="w-4 h-4 text-gray-400 ml-2 shrink-0" />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2">
             <input type="date" value={dateRange.start} onChange={e => setDateRange({...dateRange, start: e.target.value})} className="text-sm font-bold text-gray-700 outline-none bg-transparent" />
-            <span className="text-gray-300">→</span>
+            <span className="text-gray-300 hidden sm:inline">→</span>
             <input type="date" value={dateRange.end} onChange={e => setDateRange({...dateRange, end: e.target.value})} className="text-sm font-bold text-gray-700 outline-none bg-transparent" />
           </div>
         </div>
@@ -127,20 +127,20 @@ export default function InventoryCostCalculator() {
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-0 border-b border-gray-100 bg-white mt-0">
-        <div className="p-6 border-r border-gray-100">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border-b border-gray-100 bg-white mt-0">
+        <div className="p-4 md:p-6 border-r border-b md:border-b-0 border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Package className="w-3 h-3"/> Opening Stock</p>
-          <h4 className="text-2xl font-black text-gray-800">₱ {fmtMoney(cogsSummary.opening)}</h4>
+          <h4 className="text-xl md:text-2xl font-black text-gray-800">₱ {fmtMoney(cogsSummary.opening)}</h4>
         </div>
-        <div className="p-6 border-r border-gray-100">
+        <div className="p-4 md:p-6 border-b md:border-b-0 md:border-r border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3"/> + Purchases</p>
-          <h4 className="text-2xl font-black text-hcdc-blue">₱ {fmtMoney(cogsSummary.purchases)}</h4>
+          <h4 className="text-xl md:text-2xl font-black text-hcdc-blue">₱ {fmtMoney(cogsSummary.purchases)}</h4>
         </div>
-        <div className="p-6 border-r border-gray-100">
+        <div className="p-4 md:p-6 border-r border-gray-100">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Package className="w-3 h-3"/> - Closing Stock</p>
           {cogsSummary.closing != null ? (
             <div>
-              <h4 className="text-2xl font-black text-gray-800">₱ {fmtMoney(cogsSummary.closing)}</h4>
+              <h4 className="text-xl md:text-2xl font-black text-gray-800">₱ {fmtMoney(cogsSummary.closing)}</h4>
               {cogsSummary.closingIsPartial && (
                 <span className="text-[9px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">PARTIAL COUNT</span>
               )}
@@ -151,10 +151,10 @@ export default function InventoryCostCalculator() {
             </div>
           )}
         </div>
-        <div className="p-6 bg-red-50/30">
+        <div className="p-4 md:p-6 bg-red-50/30">
           <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest mb-1 flex items-center gap-1"><TrendingDown className="w-3 h-3"/> = Cost of Goods Sold</p>
           {cogsSummary.cogs != null ? (
-            <h4 className="text-2xl font-black text-red-600">₱ {fmtMoney(cogsSummary.cogs)}</h4>
+            <h4 className="text-xl md:text-2xl font-black text-red-600">₱ {fmtMoney(cogsSummary.cogs)}</h4>
           ) : (
             <div className="flex items-center gap-2 mt-1">
               <span className="text-sm font-black text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1 rounded-xl">Awaiting Count</span>
