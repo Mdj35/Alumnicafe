@@ -18,6 +18,7 @@ import {
   UtensilsCrossed,
   Edit3,
   Trash2,
+  Ban,
   X,
   Save,
   Search,
@@ -1639,9 +1640,16 @@ export default function AdminDashboard() {
                               </button>
                               <button
                                 onClick={() => initiateAdminAuth('void', txn)}
-                                className="p-2 bg-gray-50 hover:bg-red-50 text-hcdc-red rounded-lg transition-colors"
+                                className="p-2 bg-gray-50 hover:bg-orange-50 text-orange-500 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 title="Void Transaction"
                                 disabled={txn.status === 'Voided'}
+                              >
+                                <Ban className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => initiateAdminAuth('delete', txn)}
+                                className="p-2 bg-gray-50 hover:bg-red-50 text-hcdc-red rounded-lg transition-colors"
+                                title="Delete Transaction"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
