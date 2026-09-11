@@ -204,7 +204,7 @@ export default function App() {
   const [customerName, setCustomerName] = useState('');
   const [customerIdNumber, setCustomerIdNumber] = useState('');
   const [cashTendered, setCashTendered] = useState<string>('');
-  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'Online'>('Cash');
+  const [paymentMethod, setPaymentMethod] = useState<'Cash' | 'GCash'>('Cash');
   const [orNumber, setOrNumber] = useState('');
   const [onlineReference, setOnlineReference] = useState('');
   const [receiptOption, setReceiptOption] = useState<'Without OR' | 'With OR'>('Without OR');
@@ -468,8 +468,12 @@ export default function App() {
     }
     const cash = parseFloat(cashTendered) || 0;
 
-    if (cash < total) {
+    if (paymentMethod === 'Cash' && cash < total) {
       alert('Insufficient cash tendered!');
+      return;
+    }
+    if (paymentMethod === 'GCash' && !onlineReference.trim()) {
+      alert('Please enter the GCash reference number!');
       return;
     }
     if (receiptOption === 'With OR' && !orNumber.trim()) {
@@ -501,9 +505,10 @@ export default function App() {
         total,
         customerName: discountType !== 'REGULAR' ? customerName : undefined,
         customerIdNumber: discountType !== 'REGULAR' ? customerIdNumber : undefined,
-        cashTendered: cash,
-        change: Math.max(0, cash - total),
-        paymentMethod: 'Cash',
+        cashTendered: paymentMethod === 'Cash' ? cash : total,
+        change: paymentMethod === 'Cash' ? Math.max(0, cash - total) : 0,
+        paymentMethod,
+        onlineReference: paymentMethod === 'GCash' ? onlineReference.trim() : undefined,
         orNumber: receiptOption === 'With OR' ? orNumber.trim() : undefined,
       });
 
@@ -543,6 +548,7 @@ export default function App() {
     setCustomerIdNumber('');
     setCashTendered('');
     setPaymentMethod('Cash');
+    setOnlineReference('');
     setOrNumber('');
     setShowReceipt(false);
     setShowPaymentModal(false);
@@ -787,8 +793,8 @@ export default function App() {
                     onClick={() => !isOut && addToCart(product)}
                     className={`bg-white rounded-3xl p-5 border border-gray-50 shadow-sm transition-all group relative overflow-hidden ${isOut ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:border-hcdc-blue/20 cursor-pointer'}`}
                   >
-                    <div className="flex flex-col items-center text-center gap-3">
-                      <div className="w-16 h-16 rounded-2xl bg-hcdc-light-blue flex items-center justify-center group-hover:bg-white group-hover:scale-105 transition-all duration-300 shadow-inner group-hover:shadow-md overflow-hidden relative">
+                    <div className="flex flex-col items-center text-center gap-2">
+                      <div className="w-20 h-20 rounded-2xl bg-hcdc-light-blue flex items-center justify-center group-hover:bg-white group-hover:scale-105 transition-all duration-300 shadow-inner group-hover:shadow-md overflow-hidden relative flex-shrink-0">
                         {product.image ? (
                           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                         ) : (
@@ -828,14 +834,15 @@ export default function App() {
                           return null;
                         })()}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-800 text-xs leading-snug h-10 flex items-center justify-center px-1">{product.name}</h3>
-                        <p className="text-hcdc-red font-black text-lg mt-1 tracking-tight">{formatCurrency(product.price)}</p>
+                      <div className="w-full min-h-[3.5rem] flex flex-col items-center justify-start">
+                        <h3 className="font-bold text-gray-800 text-xs leading-tight line-clamp-3 px-1 text-center">{product.name}</h3>
+                        <p className="text-hcdc-red font-black text-base mt-1 tracking-tight whitespace-nowrap">{formatCurrency(product.price)}</p>
                       </div>
-                      <div className="px-4 py-1.5 bg-gray-50 group-hover:bg-hcdc-blue group-hover:text-white text-gray-400 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] transition-colors">
+                      <div className="px-3 py-1 bg-gray-50 group-hover:bg-hcdc-blue group-hover:text-white text-gray-400 rounded-xl text-[10px] font-bold uppercase tracking-[0.1em] transition-colors truncate max-w-full">
                         {product.category}
                       </div>
                     </div>
+
 
                     {/* Floating +1 animation */}
                     <AnimatePresence>
@@ -1077,36 +1084,93 @@ export default function App() {
               </div>
 
               <div className="p-6 md:p-10 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar flex-1 pb-safe">
-                <div className="space-y-3 md:space-y-4">
+
+                {/* Payment Method Selector */}
+                <div className="space-y-3">
                   <label className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
-                    <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
+                    <CreditCard className="w-3 h-3 text-hcdc-blue" /> Payment Method
                   </label>
-                  <div className="relative group">
-                    <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-2xl md:text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
-                    <input
-                      autoFocus
-                      type="number"
-                      placeholder="Enter amount"
-                      value={cashTendered}
-                      onChange={(e) => setCashTendered(e.target.value)}
-                      className="w-full h-20 pl-14 pr-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-4xl transition-all shadow-inner placeholder:text-hcdc-blue/10"
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => { setPaymentMethod('Cash'); setCashTendered(''); }}
+                      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 font-black text-sm transition-all ${
+                        paymentMethod === 'Cash'
+                          ? 'border-hcdc-blue bg-hcdc-blue text-white shadow-lg shadow-hcdc-blue/30'
+                          : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-2xl">💵</span>
+                      <span>Cash</span>
+                    </button>
+                    <button
+                      onClick={() => { setPaymentMethod('GCash'); setCashTendered(''); }}
+                      className={`flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border-2 font-black text-sm transition-all ${
+                        paymentMethod === 'GCash'
+                          ? 'border-[#0070E0] bg-[#0070E0] text-white shadow-lg shadow-[#0070E0]/30'
+                          : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="text-2xl">📱</span>
+                      <span>GCash</span>
+                    </button>
                   </div>
                 </div>
 
-                <div className="bg-gray-50 rounded-3xl p-6 flex justify-between items-center border border-gray-100">
-                  <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Change to return</p>
-                    <p className={`text-3xl font-black tracking-tighter tabular-nums ${change > 0 ? 'text-green-600' : 'text-gray-200'}`}>
-                      {formatCurrency(change)}
-                    </p>
-                  </div>
-                  {cash >= total && total > 0 && (
-                    <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4" /> Paid
+                {/* Cash Tendered — only for Cash */}
+                {paymentMethod === 'Cash' && (
+                  <>
+                    <div className="space-y-3 md:space-y-4">
+                      <label className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+                        <CreditCard className="w-3 h-3 text-hcdc-blue" /> Cash Tendered
+                      </label>
+                      <div className="relative group">
+                        <div className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 text-2xl md:text-3xl font-black text-hcdc-blue group-focus-within:text-hcdc-red transition-colors">₱</div>
+                        <input
+                          autoFocus
+                          type="number"
+                          placeholder="Enter amount"
+                          value={cashTendered}
+                          onChange={(e) => setCashTendered(e.target.value)}
+                          className="w-full h-20 pl-14 pr-8 bg-hcdc-light-blue/30 border-3 border-transparent focus:border-hcdc-blue focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-4xl transition-all shadow-inner placeholder:text-hcdc-blue/10"
+                        />
+                      </div>
                     </div>
-                  )}
-                </div>
+                    <div className="bg-gray-50 rounded-3xl p-6 flex justify-between items-center border border-gray-100">
+                      <div>
+                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Change to return</p>
+                        <p className={`text-3xl font-black tracking-tighter tabular-nums ${change > 0 ? 'text-green-600' : 'text-gray-200'}`}>
+                          {formatCurrency(change)}
+                        </p>
+                      </div>
+                      {cash >= total && total > 0 && (
+                        <div className="bg-green-100 text-green-700 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4" /> Paid
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* GCash Reference — only for GCash */}
+                {paymentMethod === 'GCash' && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 flex items-center gap-2">
+                      <span className="text-xs">📱</span> GCash Reference No.
+                    </label>
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="e.g. 12345678901"
+                      value={onlineReference}
+                      onChange={(e) => setOnlineReference(e.target.value)}
+                      className="w-full h-16 px-6 bg-[#0070E0]/5 border-3 border-transparent focus:border-[#0070E0] focus:bg-white focus:ring-0 rounded-[1.5rem] font-black text-xl tracking-widest transition-all shadow-inner placeholder:text-gray-300"
+                    />
+                    <div className="bg-[#0070E0]/5 rounded-2xl p-4 flex items-center gap-3 border border-[#0070E0]/10">
+                      <CheckCircle2 className="w-5 h-5 text-[#0070E0] shrink-0" />
+                      <p className="text-xs font-bold text-[#0070E0]">Full amount of {formatCurrency(total)} will be recorded as paid via GCash.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="bg-gray-50 p-4 md:p-6 rounded-3xl border border-gray-100 mt-4 md:mt-6">
                   <label className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.2em] text-gray-500 block mb-3 md:mb-4 flex items-center gap-2">
@@ -1163,7 +1227,12 @@ export default function App() {
                     loading={isCheckoutLoading}
                     loadingLabel="Processing…"
                     onClick={processPayment}
-                    disabled={(cash < total) || (receiptOption === 'With OR' && !orNumber.trim()) || total <= 0}
+                    disabled={
+                      total <= 0 ||
+                      (paymentMethod === 'Cash' && cash < total) ||
+                      (paymentMethod === 'GCash' && !onlineReference.trim()) ||
+                      (receiptOption === 'With OR' && !orNumber.trim())
+                    }
                     className="flex-[2] h-14 md:h-16 bg-hcdc-red hover:bg-[#A01E1F] text-white font-black rounded-2xl shadow-xl shadow-hcdc-red/30 flex items-center justify-center gap-2 md:gap-4 transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-30 disabled:grayscale disabled:scale-100 disabled:shadow-none text-sm md:text-lg uppercase tracking-wide"
                   >
                     Confirm Payment
