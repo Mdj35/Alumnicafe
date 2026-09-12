@@ -57,7 +57,7 @@ export async function updateCashier(id: number, updates: Partial<CashierAccount>
 
 export async function deleteCashier(id: number): Promise<CashierAccount[]> {
   const docRef = doc(db, COLLECTION_NAME, id.toString());
-  await updateDoc(docRef, { isActive: false });
+  await deleteDoc(docRef);
   return await getCashiers();
 }
 

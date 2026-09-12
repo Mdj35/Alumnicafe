@@ -205,6 +205,7 @@ export default function InventoryMaster() {
                     <option value="Syrup">Syrup</option>
                     <option value="Dairy">Dairy</option>
                     <option value="Consumables">Consumables</option>
+                    <option value="Beans">Beans</option>
                   </select>
                 </div>
                 <div className="md:col-span-1">

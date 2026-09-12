@@ -1469,6 +1469,9 @@ export default function AdminDashboard() {
                               <CheckCircle2 className="w-4 h-4" />
                             </button>
                           )}
+                          <button onClick={() => handleDeleteCashier(acc.id, acc.name)} className="p-2 text-red-500 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl transition-all" title="Delete">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     ))}
