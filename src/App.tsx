@@ -1255,8 +1255,7 @@ export default function App() {
               className="bg-white rounded-2xl md:rounded-3xl w-full max-w-md h-[90vh] md:h-[80vh] flex flex-col shadow-2xl overflow-hidden print:shadow-none print:h-auto print:rounded-none print:max-w-none print:w-full print:block"
             >
               <div className="no-print p-4 flex justify-between items-center border-b border-gray-100 shrink-0">
-                <h3 className="font-bold flex items-center gap-2"><CheckCircle2 className="text-green-500" /> Transaction Complete</h3>
-                <button onClick={() => setShowReceipt(false)} className="p-2 hover:bg-gray-100 rounded-full"><X /></button>
+                <h3 className="font-bold flex items-center gap-2"><Lock className="text-hcdc-blue" /> Transaction Complete</h3>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 bg-gray-100 scroll-smooth print:overflow-visible print:p-0 print:bg-white print:block">
@@ -1326,7 +1325,14 @@ export default function App() {
 
               <div className="no-print p-6 bg-white border-t border-gray-100 flex flex-col gap-3 shrink-0">
                 <button
-                  onClick={() => window.print()}
+                  onClick={() => {
+                    const afterPrint = () => {
+                      startNewTransaction();
+                      window.removeEventListener('afterprint', afterPrint);
+                    };
+                    window.addEventListener('afterprint', afterPrint);
+                    window.print();
+                  }}
                   className="w-full h-12 bg-gray-800 hover:bg-black text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
                 >
                   <Printer className="w-5 h-5" /> PRINT RECEIPT
@@ -1337,12 +1343,6 @@ export default function App() {
                     className="flex-1 h-12 bg-hcdc-blue hover:bg-hcdc-blue-dark text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all"
                   >
                     <Plus className="w-4 h-4" /> NEW TRANSACTION
-                  </button>
-                  <button
-                    onClick={() => setShowReceipt(false)}
-                    className="px-6 h-12 bg-white border-2 border-gray-200 text-gray-500 font-bold rounded-xl hover:bg-gray-50 flex items-center justify-center"
-                  >
-                    CLOSE
                   </button>
                 </div>
               </div>

@@ -47,7 +47,7 @@ import {
 import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, MenuItem, getMenuCategories, addMenuCategory, deleteMenuCategory } from './menuStorage';
 import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
 import { getCashiers, addCashier, updateCashier, deleteCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
-import { getCashCounts, CashCountRecord } from './cashCountStorage';
+import { getCashCounts, CashCountRecord, deleteCashCount } from './cashCountStorage';
 import { getInventoryItems, InventoryItem, deleteInventoryItem, saveRecipe, deleteRecipe, Recipe } from './inventoryManager';
 import InventoryDashboard from './components/inventory/InventoryDashboard';
 
@@ -99,7 +99,7 @@ export default function AdminDashboard() {
 
   // Confirmation Modals State
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState<{ id: number | string; type: 'menu' | 'cashier' | 'inventory'; name: string } | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<{ id: number | string; type: 'menu' | 'cashier' | 'inventory' | 'cashCount'; name: string } | null>(null);
 
   // Report state
   const [reportPeriod, setReportPeriod] = useState<'daily' | 'weekly' | 'monthly' | 'specific' | 'range'>('daily');
@@ -449,6 +449,9 @@ export default function AdminDashboard() {
     } else if (itemToDelete.type === 'inventory') {
       const updated = await deleteInventoryItem(itemToDelete.id as string);
       setInventory(updated);
+    } else if (itemToDelete.type === 'cashCount') {
+      const updated = await deleteCashCount(itemToDelete.id as string);
+      setCashCounts(updated);
     }
     setShowDeleteConfirm(false);
     setItemToDelete(null);
@@ -511,6 +514,11 @@ export default function AdminDashboard() {
 
   const handleDeleteCashier = (id: number, name: string) => {
     setItemToDelete({ id, type: 'cashier', name });
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteCashCountReport = (id: string, name: string) => {
+    setItemToDelete({ id, type: 'cashCount', name: `cashier report for ${name}` });
     setShowDeleteConfirm(true);
   };
 
@@ -2632,12 +2640,21 @@ export default function AdminDashboard() {
                           <p className="text-sm text-gray-500 font-medium">{count.date} &nbsp;&bull;&nbsp; {count.time}</p>
                         </div>
                       </div>
-                      <button 
-                        onClick={() => setSelectedCashCount(count)}
-                        className="bg-hcdc-blue/10 text-hcdc-blue px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-hcdc-blue hover:text-white transition-colors"
-                      >
-                        Show Report
-                      </button>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => setSelectedCashCount(count)}
+                          className="bg-hcdc-blue/10 text-hcdc-blue px-5 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-hcdc-blue hover:text-white transition-colors"
+                        >
+                          Show Report
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCashCountReport(count.id, count.cashier)}
+                          className="bg-red-50 text-hcdc-red px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-hcdc-red hover:text-white transition-colors flex items-center justify-center"
+                          title="Delete Report"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                   {cashCounts.length === 0 && (

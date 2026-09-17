@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
 export interface CashCountDenominations {
@@ -42,5 +42,15 @@ export async function getCashCounts(): Promise<CashCountRecord[]> {
   } catch (error) {
     console.error("Error fetching cash counts: ", error);
     return [];
+  }
+}
+
+export async function deleteCashCount(id: string): Promise<CashCountRecord[]> {
+  try {
+    await deleteDoc(doc(db, CASH_COUNTS_COLLECTION, id));
+    return await getCashCounts();
+  } catch (error) {
+    console.error("Error deleting cash count: ", error);
+    return await getCashCounts();
   }
 }
