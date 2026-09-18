@@ -22,23 +22,13 @@ export interface MenuItem {
 const MENU_COLLECTION = 'menu';
 const CATEGORY_COLLECTION = 'categories';
 
-const DEFAULT_PRODUCTS: MenuItem[] = [
-  { id: 1, name: 'Americano', price: 75, category: 'Coffee', icon: '☕', ingredients: [{ inventoryId: 'inv_1', quantity: 18 }] },
-  { id: 2, name: 'Café Latte', price: 95, category: 'Coffee', icon: '🥛', ingredients: [{ inventoryId: 'inv_1', quantity: 18 }, { inventoryId: 'inv_2', quantity: 150 }] },
-  { id: 3, name: 'Spanish Latte', price: 115, category: 'Coffee', icon: '☕', ingredients: [{ inventoryId: 'inv_1', quantity: 18 }, { inventoryId: 'inv_2', quantity: 180 }] },
-  { id: 4, name: 'Caramel Macchiato', price: 125, category: 'Coffee', icon: '🍮', ingredients: [{ inventoryId: 'inv_1', quantity: 18 }, { inventoryId: 'inv_2', quantity: 160 }] },
-];
 
-const DEFAULT_CATEGORIES = ['Coffee'];
 
 export async function getMenuCategories(): Promise<string[]> {
   try {
     const querySnapshot = await getDocs(collection(db, CATEGORY_COLLECTION));
     if (querySnapshot.empty) {
-      for (const cat of DEFAULT_CATEGORIES) {
-        await setDoc(doc(db, CATEGORY_COLLECTION, cat), { name: cat });
-      }
-      return [...DEFAULT_CATEGORIES];
+      return [];
     }
     const categories: string[] = [];
     querySnapshot.forEach((docSnap) => {
@@ -47,7 +37,7 @@ export async function getMenuCategories(): Promise<string[]> {
     return categories;
   } catch (error) {
     console.error("Error fetching categories:", error);
-    return [...DEFAULT_CATEGORIES];
+    return [];
   }
 }
 
@@ -71,10 +61,7 @@ export async function getMenuItems(): Promise<MenuItem[]> {
   try {
     const querySnapshot = await getDocs(collection(db, MENU_COLLECTION));
     if (querySnapshot.empty) {
-      for (const item of DEFAULT_PRODUCTS) {
-        await setDoc(doc(db, MENU_COLLECTION, item.id.toString()), item);
-      }
-      return [...DEFAULT_PRODUCTS];
+      return [];
     }
     const items: MenuItem[] = [];
     querySnapshot.forEach((docSnap) => {
@@ -83,7 +70,7 @@ export async function getMenuItems(): Promise<MenuItem[]> {
     return items.sort((a, b) => a.id - b.id);
   } catch (error) {
     console.error("Error fetching menu items:", error);
-    return [...DEFAULT_PRODUCTS];
+    return [];
   }
 }
 
