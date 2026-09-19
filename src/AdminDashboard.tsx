@@ -45,7 +45,7 @@ import {
   Area
 } from 'recharts';
 import { getMenuItems, saveMenuItems, addMenuItem, updateMenuItem, deleteMenuItem, MenuItem, getMenuCategories, addMenuCategory, deleteMenuCategory } from './menuStorage';
-import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction } from './transactions';
+import { getTransactions, TransactionRecord, deleteTransaction, updateTransaction, saveTransaction } from './transactions';
 import { getCashiers, addCashier, updateCashier, deleteCashier, toggleCashierStatus, CashierAccount } from './cashierStorage';
 import { getCashCounts, CashCountRecord, deleteCashCount } from './cashCountStorage';
 import { getInventoryItems, InventoryItem, deleteInventoryItem, saveRecipe, deleteRecipe, Recipe } from './inventoryManager';
@@ -136,7 +136,7 @@ export default function AdminDashboard() {
 
   // Edit Transaction state
   const [editingTransaction, setEditingTransaction] = useState<TransactionRecord | null>(null);
-  const [editTxnForm, setEditTxnForm] = useState({ total: 0, subtotal: 0, discountAmount: 0, vatAmount: 0, items: [] as any[] });
+  const [editTxnForm, setEditTxnForm] = useState({ date: '', total: 0, subtotal: 0, discountAmount: 0, vatAmount: 0, items: [] as any[] });
   const VAT_RATE = 0.12;
 
   // Settings state
@@ -543,6 +543,7 @@ export default function AdminDashboard() {
       } else if (authCallback.type === 'edit') {
         setEditingTransaction(authCallback.txn);
         setEditTxnForm({ 
+          date: authCallback.txn.date ? authCallback.txn.date.split('T')[0] : '',
           total: authCallback.txn.total, 
           subtotal: authCallback.txn.subtotal,
           discountAmount: authCallback.txn.discountAmount,
@@ -563,15 +564,64 @@ export default function AdminDashboard() {
 
   const handleSaveEditTransaction = async () => {
     if (!editingTransaction) return;
-    await updateTransaction(editingTransaction.id, { 
+    const originalTime = editingTransaction.date?.includes('T') ? editingTransaction.date.split('T')[1] : '00:00:00.000Z';
+    const newDateStr = editTxnForm.date ? `${editTxnForm.date}T${originalTime}` : editingTransaction.date;
+    
+    const oldDateOnly = editingTransaction.date?.split('T')[0] || '';
+    const newDateOnly = newDateStr.split('T')[0];
+    let newId = editingTransaction.id;
+
+    if (oldDateOnly && newDateOnly && oldDateOnly !== newDateOnly) {
+      const formattedNewDate = newDateOnly.replace(/-/g, '');
+      newId = editingTransaction.id.replace(/\d{8}/, formattedNewDate);
+    }
+
+    const updatedData = { 
+      ...editingTransaction,
+      id: newId,
+      date: newDateStr,
       total: editTxnForm.total, 
       subtotal: editTxnForm.subtotal,
       discountAmount: editTxnForm.discountAmount,
       vatAmount: editTxnForm.vatAmount,
       items: editTxnForm.items
-    });
+    };
+
+    if (newId !== editingTransaction.id) {
+      await saveTransaction(updatedData);
+      await deleteTransaction(editingTransaction.id);
+    } else {
+      await updateTransaction(editingTransaction.id, updatedData);
+    }
+    
     setTransactions(await getTransactions());
     setEditingTransaction(null);
+  };
+
+  const handleUpdateEditItemSelection = (index: number, newName: string) => {
+    const updatedItems = [...editTxnForm.items];
+    const menuItem = menuItems.find(m => m.name === newName);
+    if (menuItem) {
+      updatedItems[index].name = menuItem.name;
+      updatedItems[index].price = menuItem.price;
+      updatedItems[index].category = menuItem.category;
+      
+      const newSubtotal = updatedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const discountRate = editingTransaction?.discountRate || 0;
+      const newDiscountAmount = newSubtotal * discountRate;
+      const taxableAmount = (newSubtotal - newDiscountAmount) / (1 + VAT_RATE);
+      const newVatAmount = newSubtotal - newDiscountAmount - taxableAmount;
+      const newTotal = newSubtotal - newDiscountAmount;
+
+      setEditTxnForm({ 
+        ...editTxnForm, 
+        items: updatedItems, 
+        total: newTotal,
+        subtotal: newSubtotal,
+        discountAmount: newDiscountAmount,
+        vatAmount: newVatAmount
+      });
+    }
   };
 
   const handleUpdateEditItemQty = (index: number, delta: number) => {
@@ -2554,10 +2604,21 @@ export default function AdminDashboard() {
             >
               <div className="bg-hcdc-gold p-8 text-hcdc-blue">
                 <h3 className="text-sm font-black uppercase tracking-widest opacity-60 mb-1">Edit Transaction</h3>
-                <p className="text-2xl font-black tracking-tight">{editingTransaction.id}</p>
+                <p className="text-2xl font-black tracking-tight">
+                  {editTxnForm.date && editingTransaction.id.match(/\d{8}/)
+                    ? editingTransaction.id.replace(/\d{8}/, editTxnForm.date.split('T')[0].replace(/-/g, ''))
+                    : editingTransaction.id}
+                </p>
               </div>
               <div className="p-8 space-y-6">
                 <div>
+                  <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Transaction Date</label>
+                  <input
+                    type="date"
+                    value={editTxnForm.date}
+                    onChange={(e) => setEditTxnForm({ ...editTxnForm, date: e.target.value })}
+                    className="w-full h-14 px-6 mb-4 bg-gray-50 border-2 border-transparent focus:border-hcdc-blue focus:bg-white rounded-2xl font-bold text-lg transition-all"
+                  />
                   <label className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-400 block mb-2">Total Amount (₱)</label>
                   <input
                     type="number"
@@ -2572,8 +2633,21 @@ export default function AdminDashboard() {
                     {editTxnForm.items.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between bg-white/50 p-3 rounded-xl border border-hcdc-blue/5">
                         <div className="flex-1 min-w-0 mr-4">
-                          <p className="font-bold text-gray-800 text-sm truncate">{item.name}</p>
-                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">₱{item.price.toFixed(2)} / unit</p>
+                          <select
+                            value={item.name}
+                            onChange={(e) => handleUpdateEditItemSelection(idx, e.target.value)}
+                            className="w-full bg-transparent font-bold text-gray-800 text-sm border-b border-gray-300 focus:border-hcdc-blue focus:outline-none px-1 py-0.5"
+                          >
+                            {!menuItems.some(m => m.name === item.name) && (
+                              <option value={item.name} disabled>{item.name}</option>
+                            )}
+                            {menuItems.map(menuItem => (
+                              <option key={menuItem.id || menuItem.name} value={menuItem.name}>
+                                {menuItem.name}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter mt-1">₱{item.price.toFixed(2)} / unit</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <button 
