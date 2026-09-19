@@ -1311,6 +1311,12 @@ export default function App() {
                       <span className="text-gray-600">Payment:</span>
                       <span className="font-bold text-right">{paymentMethod}</span>
                     </div>
+                    {paymentMethod === 'GCash' && onlineReference && (
+                      <div className="flex justify-between gap-2">
+                        <span className="text-gray-600">GCash Ref No:</span>
+                        <span className="font-bold text-right">{onlineReference}</span>
+                      </div>
+                    )}
                     {discountType !== 'REGULAR' && (
                       <>
                         <div className="flex justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-400">
@@ -1655,6 +1661,12 @@ export default function App() {
                           <span className="text-gray-600">Payment:</span>
                           <span className="font-bold text-right">{viewingMyCashierReceipt.paymentMethod}</span>
                         </div>
+                        {viewingMyCashierReceipt.paymentMethod === 'GCash' && viewingMyCashierReceipt.onlineReference && (
+                          <div className="flex justify-between gap-2">
+                            <span className="text-gray-600">GCash Ref No:</span>
+                            <span className="font-bold text-right">{viewingMyCashierReceipt.onlineReference}</span>
+                          </div>
+                        )}
                         {viewingMyCashierReceipt.discountType && viewingMyCashierReceipt.discountType !== 'REGULAR' && (
                           <>
                             <div className="flex justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-400">
