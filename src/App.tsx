@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { saveTransaction, updateCashierNames, getNextTxnNumber } from './transactions';
+import { saveTransaction, updateCashierNames, getNextTxnNumber, getTransactions, TransactionRecord } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
 import { getInventoryItems, InventoryItem, deductIngredientsByRecipe, getRecipes, Recipe, getOpeningStocks } from './inventoryManager';
@@ -35,7 +35,10 @@ import {
   Minimize,
   Lock,
   Unlock,
-  KeyRound
+  KeyRound,
+  History,
+  ArrowLeft,
+  CalendarDays
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
@@ -254,6 +257,29 @@ export default function App() {
   const [showVerifyCashCountModal, setShowVerifyCashCountModal] = useState(false);
   const [previousCashCount, setPreviousCashCount] = useState<CashCountRecord | null>(null);
 
+  // --- My Transactions ---
+  const [showMyTransactions, setShowMyTransactions] = useState(false);
+  const [myTransactions, setMyTransactions] = useState<TransactionRecord[]>([]);
+  const [isLoadingMyTxns, setIsLoadingMyTxns] = useState(false);
+  const [viewingMyCashierReceipt, setViewingMyCashierReceipt] = useState<TransactionRecord | null>(null);
+
+  // --- Receipt Notes ---
+  const [receiptNote, setReceiptNote] = useState('');
+  const [myReceiptNote, setMyReceiptNote] = useState('');
+
+  const openMyTransactions = async () => {
+    setShowMyTransactions(true);
+    setViewingMyCashierReceipt(null);
+    setMyReceiptNote('');
+    setIsLoadingMyTxns(true);
+    try {
+      const all = await getTransactions();
+      setMyTransactions(all.filter(t => t.cashier === cashierName));
+    } finally {
+      setIsLoadingMyTxns(false);
+    }
+  };
+
   const confirmCashCountVerification = () => {
     sessionStorage.setItem('cashCountVerified', 'true');
     setShowVerifyCashCountModal(false);
@@ -313,14 +339,7 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  useEffect(() => {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = (now.getMonth() + 1).toString().padStart(2, '0');
-    const day = now.getDate().toString().padStart(2, '0');
-    const dateStr = `${year}${month}${day}`;
-    setTxnNumber(`TXN-${dateStr}-PENDING`);
-  }, [showReceipt]);
+
 
   // --- Calculations ---
   const filteredProducts = useMemo(() => {
@@ -544,6 +563,7 @@ export default function App() {
     setPaymentMethod('Cash');
     setOnlineReference('');
     setOrNumber('');
+    setReceiptNote('');
     setShowReceipt(false);
     setShowPaymentModal(false);
   };
@@ -659,6 +679,13 @@ export default function App() {
               <div className="hidden sm:flex w-10 h-10 rounded-xl bg-hcdc-gold items-center justify-center text-hcdc-blue font-black text-sm shadow-lg">
                 {cashierName.charAt(0).toUpperCase()}
               </div>
+              <button
+                onClick={openMyTransactions}
+                className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors"
+                title="My Transactions"
+              >
+                <History className="w-4 h-4" />
+              </button>
               <button
                 onClick={handleFullscreenToggle}
                 className="w-10 h-10 rounded-xl bg-white/10 hover:bg-hcdc-blue-light flex items-center justify-center text-white transition-colors"
@@ -1313,6 +1340,23 @@ export default function App() {
                     ))}
                   </div>
 
+                  {/* Note — input shown on screen, text shown on print */}
+                  <div className="mb-3 relative">
+                    <textarea
+                      value={receiptNote}
+                      onChange={e => setReceiptNote(e.target.value)}
+                      placeholder="Add a note to this receipt (e.g. customer name, paid by voucher)…"
+                      rows={2}
+                      className="no-print w-full text-[11px] border border-dashed border-gray-300 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-hcdc-blue placeholder-gray-300 text-gray-600"
+                    />
+                    {receiptNote.trim() && (
+                      <div className="print-only border-t border-dashed border-gray-400 pt-2 text-[11px] text-gray-700">
+                        <p className="font-bold text-gray-500 uppercase text-[9px] tracking-widest mb-0.5">Note</p>
+                        <p className="whitespace-pre-wrap leading-snug">{receiptNote.trim()}</p>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="border-t border-dashed border-gray-400 pt-3 text-center relative">
                     <p className="font-bold text-[10px] text-gray-500">
                       THIS IS NOT AN OFFICIAL RECEIPT
@@ -1525,6 +1569,227 @@ export default function App() {
                   </div>
                 </form>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MY TRANSACTIONS MODAL */}
+      <AnimatePresence>
+        {showMyTransactions && (
+          <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-0 sm:p-4 no-print">
+            <motion.div
+              initial={{ y: '100%', opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: '100%', opacity: 0 }}
+              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="bg-white w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl shadow-2xl flex flex-col overflow-hidden"
+              style={{ maxHeight: '90vh' }}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-hcdc-blue to-hcdc-blue-dark p-5 text-white flex items-center gap-3 shrink-0">
+                {viewingMyCashierReceipt ? (
+                  <button
+                    onClick={() => { setViewingMyCashierReceipt(null); setMyReceiptNote(''); }}
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors shrink-0"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                    <History className="w-4 h-4" />
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h3 className="font-black text-sm uppercase tracking-widest">
+                    {viewingMyCashierReceipt ? 'Receipt' : 'My Transactions'}
+                  </h3>
+                  <p className="text-[10px] text-white/50 font-medium">
+                    {viewingMyCashierReceipt
+                      ? viewingMyCashierReceipt.id
+                      : `${cashierName} · View & Reprint Only`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => { setShowMyTransactions(false); setViewingMyCashierReceipt(null); }}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="flex-1 overflow-y-auto">
+                {viewingMyCashierReceipt ? (
+                  /* ---- RECEIPT VIEW ---- */
+                  <div className="p-6 bg-gray-50 min-h-full">
+                    <div id="my-receipt-content" className="bg-white p-5 shadow-md mx-auto w-full max-w-[300px] text-[12px] text-black relative">
+                      {/* Watermark */}
+                      <div className="absolute inset-0 opacity-[0.02] flex items-center justify-center pointer-events-none">
+                        <UtensilsCrossed className="w-48 h-48" />
+                      </div>
+
+                      <div className="text-center space-y-1 mb-5 relative">
+                        <p className="text-xs font-bold text-gray-600 uppercase">Order Number</p>
+                        <p className="text-4xl font-black text-black">{viewingMyCashierReceipt.id.split('-').pop()}</p>
+                        <div className="h-1" />
+                        <p className="text-base font-black uppercase text-black">HCDC Alumni Cafe</p>
+                      </div>
+
+                      <div className="border-t border-dashed border-gray-400 py-3 space-y-1.5 text-xs relative">
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-600">Cashier:</span>
+                          <span className="font-bold text-right">{viewingMyCashierReceipt.cashier}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-600 shrink-0">Date &amp; Time:</span>
+                          <span className="font-bold text-right">
+                            {new Date(viewingMyCashierReceipt.date).toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' })} {viewingMyCashierReceipt.time}
+                          </span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-600">Transaction:</span>
+                          <span className="font-bold text-right">{viewingMyCashierReceipt.id}</span>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                          <span className="text-gray-600">Payment:</span>
+                          <span className="font-bold text-right">{viewingMyCashierReceipt.paymentMethod}</span>
+                        </div>
+                        {viewingMyCashierReceipt.discountType && viewingMyCashierReceipt.discountType !== 'REGULAR' && (
+                          <>
+                            <div className="flex justify-between gap-2 mt-2 pt-2 border-t border-dashed border-gray-400">
+                              <span className="text-gray-600">Customer:</span>
+                              <span className="font-bold text-right">{viewingMyCashierReceipt.customerName}</span>
+                            </div>
+                            <div className="flex justify-between gap-2">
+                              <span className="text-gray-600">{viewingMyCashierReceipt.discountType} ID:</span>
+                              <span className="font-bold text-right">{viewingMyCashierReceipt.customerIdNumber}</span>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="border-t border-gray-400 pt-2 mb-1 font-bold text-[11px] relative">
+                        <div className="flex gap-2 text-gray-600">
+                          <span className="w-8">QTY</span>
+                          <span className="flex-1">ITEM</span>
+                        </div>
+                      </div>
+                      <div className="border-b border-gray-400 pb-2 mb-4 relative">
+                        {viewingMyCashierReceipt.items.map((item, idx) => (
+                          <div key={idx} className="flex gap-2 py-1 leading-tight text-[12px]">
+                            <span className="w-8 font-bold">{item.quantity}</span>
+                            <span className="flex-1 font-bold text-black">
+                              {item.name}
+                              <span className="text-[10px] text-gray-500 font-normal block">{item.category}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Note — input shown on screen, text shown on print */}
+                      <div className="mb-3 relative">
+                        <textarea
+                          value={myReceiptNote}
+                          onChange={e => setMyReceiptNote(e.target.value)}
+                          placeholder="Add a note to this receipt (e.g. customer name, paid by voucher)…"
+                          rows={2}
+                          className="no-print w-full text-[11px] border border-dashed border-gray-300 rounded-lg px-3 py-2 resize-none focus:outline-none focus:border-hcdc-blue placeholder-gray-300 text-gray-600"
+                        />
+                        {myReceiptNote.trim() && (
+                          <div className="print-only border-t border-dashed border-gray-400 pt-2 text-[11px] text-gray-700">
+                            <p className="font-bold text-gray-500 uppercase text-[9px] tracking-widest mb-0.5">Note</p>
+                            <p className="whitespace-pre-wrap leading-snug">{myReceiptNote.trim()}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t border-dashed border-gray-400 pt-3 text-center relative">
+                        <p className="font-bold text-[10px] text-gray-500">THIS IS NOT AN OFFICIAL RECEIPT</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  /* ---- LIST VIEW ---- */
+                  <div className="p-4">
+                    {isLoadingMyTxns ? (
+                      <div className="flex flex-col items-center justify-center py-16 gap-3">
+                        <div className="w-8 h-8 border-4 border-hcdc-blue border-t-transparent rounded-full animate-spin" />
+                        <p className="text-sm font-bold text-gray-400">Loading transactions…</p>
+                      </div>
+                    ) : myTransactions.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
+                        <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center">
+                          <Receipt className="w-8 h-8 text-gray-300" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-400">No transactions found</p>
+                        <p className="text-xs text-gray-300">Your completed transactions will appear here</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {myTransactions.map((txn) => (
+                          <motion.div
+                            key={txn.id}
+                            initial={{ opacity: 0, y: 8 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-hcdc-blue/20 transition-all"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="text-xl font-black text-hcdc-blue tabular-nums">
+                                    #{txn.id.split('-').pop()}
+                                  </span>
+                                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                    txn.status === 'Voided'
+                                      ? 'bg-red-100 text-red-500'
+                                      : 'bg-green-100 text-green-600'
+                                  }`}>
+                                    {txn.status || 'Completed'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-[11px] text-gray-400 font-medium">
+                                  <CalendarDays className="w-3 h-3" />
+                                  <span>
+                                    {new Date(txn.date).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' })} · {txn.time}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 mt-2">
+                                  <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-lg">
+                                    {txn.paymentMethod || 'Cash'}
+                                  </span>
+                                  <span className="text-[10px] text-gray-400">
+                                    {txn.items.reduce((s, i) => s + i.quantity, 0)} item{txn.items.reduce((s, i) => s + i.quantity, 0) !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => setViewingMyCashierReceipt(txn)}
+                                className="shrink-0 flex items-center gap-1.5 px-3 py-2 bg-hcdc-blue hover:bg-hcdc-blue-dark text-white text-[11px] font-bold rounded-xl transition-colors"
+                              >
+                                <Receipt className="w-3.5 h-3.5" />
+                                View
+                              </button>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer — print button only visible in receipt view */}
+              {viewingMyCashierReceipt && (
+                <div className="p-4 border-t border-gray-100 bg-white shrink-0 no-print">
+                  <button
+                    onClick={() => window.print()}
+                    className="w-full h-12 bg-gray-800 hover:bg-black text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                  >
+                    <Printer className="w-4 h-4" /> PRINT RECEIPT
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}

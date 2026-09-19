@@ -107,6 +107,7 @@ export default function AdminDashboard() {
   const [reportDateFilterEnd, setReportDateFilterEnd] = useState('');
   const [reportShiftFilter, setReportShiftFilter] = useState('All');
   const [reportCashierFilter, setReportCashierFilter] = useState('All');
+  const [reportCategoryFilter, setReportCategoryFilter] = useState('All');
 
   // Inventory state
   const [inventory, setInventory] = useState<any[]>([]);
@@ -1130,6 +1131,12 @@ export default function AdminDashboard() {
   if (reportCashierFilter !== 'All') {
     filteredReports = filteredReports.filter(t => t.cashier === reportCashierFilter);
   }
+
+  if (reportCategoryFilter !== 'All') {
+    filteredReports = filteredReports.filter(t =>
+      t.items.some(item => item.category === reportCategoryFilter)
+    );
+  }
   
   const sortedTransactions = [...filteredReports].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -1587,6 +1594,23 @@ export default function AdminDashboard() {
                       ))}
                     </select>
                   </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Tag className="w-4 h-4 text-gray-400" />
+                    </div>
+                    <select
+                      value={reportCategoryFilter}
+                      onChange={(e) => setReportCategoryFilter(e.target.value)}
+                      className="bg-white border-2 border-gray-100 text-gray-600 pl-10 pr-8 py-2 rounded-xl font-bold text-sm focus:border-hcdc-blue focus:ring-0 transition-colors shadow-sm outline-none appearance-none"
+                    >
+                      <option value="All">All Categories</option>
+                      {categories.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <button
                     onClick={() => handleReportExport('daily', sortedTransactions)}
                     disabled={sortedTransactions.length === 0}

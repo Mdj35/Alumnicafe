@@ -60,6 +60,17 @@
   }
 }
 
+/* Hidden on screen, shown only when printing */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
