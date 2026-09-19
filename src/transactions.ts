@@ -1,4 +1,4 @@
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, query, where, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
 
 export interface TransactionRecord {
@@ -29,6 +29,44 @@ export interface TransactionRecord {
 }
 
 const TRANSACTIONS_COLLECTION = 'transactions';
+const COUNTERS_COLLECTION = 'system';
+const TXN_COUNTER_DOC = 'txn_counter';
+
+export async function getNextTxnNumber(): Promise<string> {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = (now.getMonth() + 1).toString().padStart(2, '0');
+  const day = now.getDate().toString().padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+  
+  const counterRef = doc(db, COUNTERS_COLLECTION, TXN_COUNTER_DOC);
+  
+  try {
+    const nextNum = await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
+      let newCount = 1;
+      
+      if (!counterDoc.exists()) {
+        transaction.set(counterRef, { count: 1, date: dateStr });
+      } else {
+        const data = counterDoc.data();
+        if (data.date === dateStr) {
+          newCount = (data.count || 0) + 1;
+          transaction.update(counterRef, { count: newCount });
+        } else {
+          transaction.update(counterRef, { count: 1, date: dateStr });
+        }
+      }
+      return newCount;
+    });
+    
+    return `TXN-${dateStr}-${nextNum.toString().padStart(4, '0')}`;
+  } catch (error) {
+    console.error("Error generating shared transaction number: ", error);
+    // Fallback: random string to prevent overwrite
+    return `TXN-${dateStr}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+  }
+}
 
 export async function saveTransaction(txn: TransactionRecord): Promise<void> {
   const finalTxn: any = { ...txn, status: txn.status || 'Completed' };

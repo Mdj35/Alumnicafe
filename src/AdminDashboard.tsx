@@ -2284,6 +2284,10 @@ export default function AdminDashboard() {
                       <span className="text-gray-500">Transaction Number:</span>
                       <span className="font-bold">{viewingReceipt.id}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Payment:</span>
+                      <span className="font-bold">{viewingReceipt.paymentMethod}</span>
+                    </div>
                   </div>
 
                   <div className="border-t border-gray-400 pt-3 mb-1 font-bold text-[10px] relative">

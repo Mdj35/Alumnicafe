@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { saveTransaction, updateCashierNames } from './transactions';
+import { saveTransaction, updateCashierNames, getNextTxnNumber } from './transactions';
 import { getMenuItems, MenuItem, addMenuItem, deleteMenuItem, getMenuCategories } from './menuStorage';
 import { getCashiers, addCashier, deleteCashier, CashierAccount } from './cashierStorage';
 import { getInventoryItems, InventoryItem, deductIngredientsByRecipe, getRecipes, Recipe, getOpeningStocks } from './inventoryManager';
@@ -315,26 +315,11 @@ export default function App() {
 
   useEffect(() => {
     const now = new Date();
-    const businessDate = new Date(now);
-    if (now.getHours() < 7) {
-      businessDate.setDate(businessDate.getDate() - 1);
-    }
-    const dateStr = businessDate.toISOString().slice(0, 10).replace(/-/g, '');
-
-    const savedDate = localStorage.getItem('txnBusinessDate');
-    let nextTxnNum = 1;
-
-    if (savedDate === dateStr) {
-      const savedTxn = localStorage.getItem('lastTxn') || '0';
-      nextTxnNum = parseInt(savedTxn) + 1;
-    } else {
-      nextTxnNum = 1;
-      localStorage.setItem('txnBusinessDate', dateStr);
-      localStorage.setItem('lastTxn', '0');
-    }
-
-    const nextTxnStr = nextTxnNum.toString().padStart(4, '0');
-    setTxnNumber(`TXN-${dateStr}-${nextTxnStr}`);
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    setTxnNumber(`TXN-${dateStr}-PENDING`);
   }, [showReceipt]);
 
   // --- Calculations ---
@@ -486,8 +471,11 @@ export default function App() {
     setIsCheckoutLoading(true);
     startLoading('checkout');
     try {
+      const finalTxnNumber = await getNextTxnNumber();
+      setTxnNumber(finalTxnNumber); // Update the state so the receipt shows the correct final number
+      
       await saveTransaction({
-        id: txnNumber,
+        id: finalTxnNumber,
         date: now.toISOString(),
         time: now.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
         cashier: cashierName,
@@ -514,7 +502,7 @@ export default function App() {
 
       // Deduct inventory and update sold-today counter
       if (cart.length > 0) {
-        await deductIngredientsByRecipe(cart.map(c => ({ id: c.id, quantity: c.quantity })), txnNumber);
+        await deductIngredientsByRecipe(cart.map(c => ({ id: c.id, quantity: c.quantity })), finalTxnNumber);
         const updatedInv = await getInventoryItems();
         setInventory(updatedInv);
         // Update the per-product sold count for threshold display and persist to localStorage
@@ -540,8 +528,14 @@ export default function App() {
   };
 
   const startNewTransaction = () => {
-    const lastNum = txnNumber.split('-').pop() || '0';
-    localStorage.setItem('lastTxn', parseInt(lastNum).toString());
+    // Generate temporary pending number
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const day = now.getDate().toString().padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    setTxnNumber(`TXN-${dateStr}-PENDING`);
+    
     setCart([]);
     setDiscountType('REGULAR');
     setCustomerName('');
@@ -1285,6 +1279,10 @@ export default function App() {
                     <div className="flex justify-between gap-2">
                       <span className="text-gray-600">Transaction:</span>
                       <span className="font-bold text-right">{txnNumber}</span>
+                    </div>
+                    <div className="flex justify-between gap-2">
+                      <span className="text-gray-600">Payment:</span>
+                      <span className="font-bold text-right">{paymentMethod}</span>
                     </div>
                     {discountType !== 'REGULAR' && (
                       <>
