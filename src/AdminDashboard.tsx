@@ -661,11 +661,11 @@ export default function AdminDashboard() {
       const cashiersInData = Array.from(new Set(dailyData.map(t => t.cashier))).sort();
       maxCashiers = Math.max(maxCashiers, cashiersInData.length);
 
-      const itemStats: Record<string, { price: number, cashiers: Record<string, { qty: number, amnt: number }> }> = {};
+      const itemStats: Record<string, { price: number, category: string, cashiers: Record<string, { qty: number, amnt: number }> }> = {};
       dailyData.forEach(txn => {
         txn.items.forEach((item: any) => {
           if (!itemStats[item.name]) {
-            itemStats[item.name] = { price: item.price, cashiers: {} };
+            itemStats[item.name] = { price: item.price, category: item.category, cashiers: {} };
           }
           if (!itemStats[item.name].cashiers[txn.cashier]) {
             itemStats[item.name].cashiers[txn.cashier] = { qty: 0, amnt: 0 };
@@ -679,6 +679,7 @@ export default function AdminDashboard() {
 
       const hr1 = [
         createCell('Café Item', headerStyle),
+        createCell('Category', headerStyle),
         createCell('Price', headerStyle),
         createCell(dateStr, headerStyle)
       ];
@@ -686,14 +687,14 @@ export default function AdminDashboard() {
       hr1.push(createCell('Total Qty and Sales', headerStyle), createCell('', headerStyle));
       rows.push(hr1);
 
-      const hr2 = [createCell('', headerStyle), createCell('', headerStyle)];
+      const hr2 = [createCell('', headerStyle), createCell('', headerStyle), createCell('', headerStyle)];
       cashiersInData.forEach(c => { 
         hr2.push(createCell(c, headerStyle), createCell('', headerStyle)); 
       });
       hr2.push(createCell('', headerStyle), createCell('', headerStyle));
       rows.push(hr2);
 
-      const hr3 = [createCell('', headerStyle), createCell('', headerStyle)];
+      const hr3 = [createCell('', headerStyle), createCell('', headerStyle), createCell('', headerStyle)];
       cashiersInData.forEach(() => { 
         hr3.push(createCell('Qty', headerStyle), createCell('Amnt', headerStyle)); 
       });
@@ -709,6 +710,7 @@ export default function AdminDashboard() {
         const stats = itemStats[itemName];
         const row = [
           createCell(itemName, cellStyleLeft),
+          createCell(stats.category, cellStyleLeft),
           createCell(stats.price, cellStyleRight, 'n', '#,##0.00')
         ];
         let itemTotalQty = 0;
@@ -733,6 +735,7 @@ export default function AdminDashboard() {
 
       const totalRow: any[] = [
         createCell('', { font: defaultFont, border: borderStyle }),
+        createCell('', { font: defaultFont, border: borderStyle }),
         createCell('', { font: defaultFont, border: borderStyle })
       ];
       cashiersInData.forEach(c => {
@@ -746,12 +749,13 @@ export default function AdminDashboard() {
       merges.push(
         { s: { r: startRow, c: 0 }, e: { r: startRow + 2, c: 0 } },
         { s: { r: startRow, c: 1 }, e: { r: startRow + 2, c: 1 } },
-        { s: { r: startRow, c: 2 }, e: { r: startRow, c: 1 + cashiersInData.length * 2 } },
-        { s: { r: startRow, c: 2 + cashiersInData.length * 2 }, e: { r: startRow + 1, c: 3 + cashiersInData.length * 2 } }
+        { s: { r: startRow, c: 2 }, e: { r: startRow + 2, c: 2 } },
+        { s: { r: startRow, c: 3 }, e: { r: startRow, c: 2 + cashiersInData.length * 2 } },
+        { s: { r: startRow, c: 3 + cashiersInData.length * 2 }, e: { r: startRow + 1, c: 4 + cashiersInData.length * 2 } }
       );
 
       cashiersInData.forEach((c, i) => {
-        merges.push({ s: { r: startRow + 1, c: 2 + i * 2 }, e: { r: startRow + 1, c: 3 + i * 2 } });
+        merges.push({ s: { r: startRow + 1, c: 3 + i * 2 }, e: { r: startRow + 1, c: 4 + i * 2 } });
       });
 
       startRow += 3 + itemNames.length + 1 + 2; 
@@ -762,7 +766,7 @@ export default function AdminDashboard() {
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws['!merges'] = merges;
 
-    const wscols = [{ wch: 25 }, { wch: 10 }];
+    const wscols = [{ wch: 25 }, { wch: 15 }, { wch: 10 }];
     for (let i = 0; i < maxCashiers * 2; i++) wscols.push({ wch: 12 });
     wscols.push({ wch: 12 }, { wch: 15 });
     ws['!cols'] = wscols;
